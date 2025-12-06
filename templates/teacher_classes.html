@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>My Classes · G School</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    :root {
+      --bg:#f6f8fb;
+      --card-bg:#ffffff;
+      --border:#e6e9ef;
+      --brand:#0b57d0;
+      --text:#101828;
+      --muted:#667085;
+    }
+    body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+    header{padding:1rem 2rem;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:space-between;}
+    .brand{font-weight:700;font-size:1.1rem;display:flex;align-items:center;gap:.5rem;}
+    main{padding:1.5rem 2rem;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;align-items:stretch;}
+    .card{background:var(--card-bg);border-radius:12px;padding:1rem;box-shadow:0 4px 14px rgba(0,0,0,.06);border:1px solid var(--border);display:flex;flex-direction:column;justify-content:space-between;}
+    .card h3{margin:0 0 .4rem;font-size:1.02rem;color:var(--text);}
+    .badge{font-size:.78rem;color:var(--muted);margin-bottom:.25rem;}
+    .pill{display:inline-flex;align-items:center;gap:.25rem;border-radius:999px;padding:.1rem .6rem;font-size:.7rem;border:1px solid var(--border);background:#f3f6fb;color:#344054;}
+    .pill span{font-size:.9rem;}
+    .btn-row{display:flex;gap:.5rem;margin-top:.75rem;}
+    .btn-row button,.btn-row a{flex:1;}
+    .new-card{border-style:dashed;border-color:#c4c9d6;cursor:auto;text-align:left;color:var(--muted);}
+    form.new-form,form.edit-form{display:flex;flex-direction:column;gap:.6rem;margin-top:.75rem;font-size:.85rem;}
+    textarea{min-height:72px;}
+    details summary{cursor:pointer;font-size:.82rem;color:#475467;}
+    details[open] summary{margin-bottom:.35rem;}
+    small.muted{color:#98a2b3;}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span>G School · Classes</span>
+    </div>
+    <div>
+      <small>{{ user.email }}</small>
+    </div>
+  </header>
+
+  <main>
+    <section class="grid">
+      {% for cid, cls in classes %}
+      <article class="card">
+        <div>
+          <h3>{{ cls.name or 'Untitled class' }}</h3>
+          <p class="badge">
+            {{ cls.students|length }} students ·
+            {% if cls.active %}
+              <span class="pill"><span>●</span> Active</span>
+            {% else %}
+              <span class="pill"><span>●</span> Inactive</span>
+            {% endif %}
+          </p>
+          {% if cls.schedule and cls.schedule.window %}
+            <p class="badge"><small class="muted">{{ cls.schedule.window }}</small></p>
+          {% endif %}
+        </div>
+        <div class="btn-row">
+          <a class="secondary" role="button" href="{{ url_for('teacher_class_page', cid=cid) }}">Open session</a>
+        </div>
+        <details>
+          <summary>Edit class details</summary>
+          <form class="edit-form" method="post" action="{{ url_for('edit_class_session', cid=cid) }}">
+            <label>
+              Class name
+              <input name="name" value="{{ cls.name }}" required />
+            </label>
+            <label>
+              Student emails (one per line)
+              <textarea name="students">{% for s in cls.students %}{{ s }}{% if not loop.last %}&#10;{% endif %}{% endfor %}</textarea>
+            </label>
+            <label>
+              Optional schedule label
+              <input name="window" value="{{ cls.schedule.window if cls.schedule and cls.schedule.window }}" placeholder="e.g. M–F · 9:00–9:45am" />
+            </label>
+            <div class="btn-row">
+              <button type="submit">Save</button>
+              <button type="submit"
+                      class="secondary"
+                      formaction="{{ url_for('delete_class_session', cid=cid) }}"
+                      formmethod="post"
+                      onclick="return confirm('Delete this class session?');">
+                Delete
+              </button>
+            </div>
+          </form>
+        </details>
+      </article>
+      {% endfor %}
+
+      <article class="card new-card">
+        <div>
+          <h3>New class session</h3>
+          <p class="badge">Create a new class with its own roster and schedule.</p>
+        </div>
+        <form class="new-form" method="post" action="{{ url_for('create_class_session') }}">
+          <label>
+            Class name
+            <input name="name" required placeholder="e.g. 3rd Period ELA" />
+          </label>
+          <label>
+            Student emails (one per line)
+            <textarea name="students" placeholder="student1@example.com&#10;student2@example.com"></textarea>
+          </label>
+          <label>
+            Optional schedule label
+            <input name="window" placeholder="e.g. M–F · 9:00–9:45am" />
+          </label>
+          <button type="submit">Create class</button>
+        </form>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
