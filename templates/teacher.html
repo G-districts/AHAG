@@ -787,6 +787,15 @@ const state = {
    Load initial class data
 ----------------------------------------------------------- */
 const CLASS_ID = (window.CLASS_ID || '{{ class_id or "period1" }}');
+
+/* NEW: class roster + helper to only show students in this class session */
+let CLASS_ROSTER = new Set();
+function inRoster(id){
+  if(!id) return false;
+  if(!CLASS_ROSTER || !CLASS_ROSTER.size) return true; // if we don't know roster yet, show everyone
+  return CLASS_ROSTER.has(String(id).toLowerCase());
+}
+
 async function loadData(){
   const j = await (await fetch('/api/data?class_id=' + encodeURIComponent(CLASS_ID))).json();
   const cls = j.classes[CLASS_ID] || Object.values(j.classes)[0] || {};
@@ -796,15 +805,45 @@ async function loadData(){
   $('#active').checked = !!cls.active;
   $('#classTitle').textContent = cls.name || 'Class Session';
   $('#updateTime').textContent = 'Update Time';
+
+  /* Try to pick up roster emails / students from the class object */
+  const rosterRaw =
+    cls.students ||
+    cls.roster ||
+    cls.student_emails ||
+    cls.roster_emails ||
+    [];
+  CLASS_ROSTER = new Set(
+    (rosterRaw || []).map(e => String(e).toLowerCase())
+  );
 }
 loadData();
+
+/* Helper: get active students in this class session, filtered to roster if we know it */
+async function getActiveClassStudents(){
+  try{
+    const res = await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID));
+    if(!res.ok) return [];
+    const presRaw = await res.json();
+    return Object.keys(presRaw || {}).filter(inRoster);
+  }catch(e){
+    return [];
+  }
+}
 
 /* -----------------------------------------------------------
    Presence + Smart Screenshot Persistence
 ----------------------------------------------------------- */
 async function refreshPresence(){
   const res = await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID)); if(!res.ok) return;
-  const pres = await res.json(); state.presence = pres;
+  const presRaw = await res.json();
+
+  /* Filter presence down to only students in this class roster (if known) */
+  const pres = {};
+  Object.entries(presRaw || {}).forEach(([id, info])=>{
+    if(inRoster(id)) pres[id] = info;
+  });
+  state.presence = pres;
   const now = Date.now();
 
   // Merge live presence into cache
@@ -839,16 +878,22 @@ async function refreshPresence(){
     });
   });
 
-  // Mark offline/inactive students
+  // Mark offline/inactive students (but only if they belong to this class)
   for(const [student, cache] of Object.entries(studentCache)){
+    if(!inRoster(student)) continue;
     const seen = pres.hasOwnProperty(student);
     const inactive = (now - (cache.lastActive||0)) > 5*60*1000;
     if(!seen || inactive) setStudentCache(student, {offline:true});
   }
 
-  // Render grid
+  // Render grid (only roster students)
   const grid = $('#screenGrid'); grid.innerHTML='';
-  const allIds = Array.from(new Set([...Object.keys(studentCache), ...Object.keys(pres)])).sort();
+  const allIds = Array.from(
+    new Set([
+      ...Object.keys(studentCache).filter(inRoster),
+      ...Object.keys(pres)
+    ])
+  ).sort();
 
   allIds.forEach(student=>{
     const info = pres[student] || {};
@@ -1029,6 +1074,7 @@ $('#focusBtn').onclick = async ()=>{
     const res=await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID)); if(res.ok){
       const pres=await res.json();
       for(const s of Object.keys(pres)){
+        if(!inRoster(s)) continue;
         await fetch('/api/student/set',{method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({student:s, focus_mode:box.checked})});
       }
     }
@@ -1042,6 +1088,7 @@ $('#pauseBtn').onclick = async ()=>{
     const res=await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID)); if(res.ok){
       const pres=await res.json();
       for(const s of Object.keys(pres)){
+        if(!inRoster(s)) continue;
         await fetch('/api/student/set',{method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({student:s, paused:box.checked})});
       }
     }
@@ -1049,16 +1096,27 @@ $('#pauseBtn').onclick = async ()=>{
   }finally{ hideOverlay(); }
 };
 
-/* Notify */
+/* UPDATED Notify: send per-student notify to all active students in this class session */
 $('#notifyBtn').onclick = async ()=>{
-  const title = prompt('Notification title','Look at the teacher'); if(title===null) return;
+  const title = prompt('Notification title','Look at the teacher'); 
+  if(title === null) return;
   const message = prompt('Message (optional)','Please look up at the teacher now.');
-  await fetch('/api/notify',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({class_id: CLASS_ID, title, message})
-  });
-  toast('Notification sent');
+  if(message === null) return;
+
+  const students = await getActiveClassStudents();
+  if(!students.length){
+    alert('No active students in this class session.');
+    return;
+  }
+
+  for(const student of students){
+    await fetch(`/api/commands/${encodeURIComponent(student)}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({type:'notify', title, message})
+    });
+  }
+  toast('Notification sent to class');
 };
 
 /* -----------------------------------------------------------
@@ -1074,7 +1132,8 @@ async function loadStudentsIntoSelect(){
   try{
     const p = await (await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID))).json();
     const sel = $('#studentSelect'); sel.innerHTML = '';
-    Object.keys(p||{}).sort().forEach(id=>{
+    const ids = Object.keys(p||{}).filter(inRoster).sort();
+    ids.forEach(id=>{
       const opt = document.createElement('option'); opt.value=id; opt.textContent=id; sel.appendChild(opt);
     });
   }catch(e){}
@@ -1194,7 +1253,7 @@ async function pollHands(){
 setInterval(pollHands, 3000); pollHands();
 
 /* -----------------------------------------------------------
-   Scenes (unchanged endpoints)
+   Scenes (unchanged endpoints, but dialogs filtered to class students)
 ----------------------------------------------------------- */
 const scenesSection = $('#scenesSection');
 $('#navScenes').onclick = ()=>{ $$('.nav-btn').forEach(b=>b.classList.remove('active')); $('#navScenes').classList.add('active'); scenesSection.style.display='block'; };
@@ -1365,7 +1424,7 @@ async function openSceneApplyDialog(id){
     const res = await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID));
     if(res.ok){
       const pres = await res.json();
-      ids = Object.keys(pres||{}).sort();
+      ids = Object.keys(pres||{}).filter(inRoster).sort();
     }
   }catch(e){}
 
@@ -1485,7 +1544,7 @@ if(sceneApplyDlg){
     try{
       const res = await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID)); if(!res.ok) return;
       const pres = await res.json();
-      const ids = Object.keys(pres||{}).sort();
+      const ids = Object.keys(pres||{}).filter(inRoster).sort();
       for(const elId of ['tlStudent', 'shStudent']){
         const sel = document.getElementById(elId);
         if(!sel) continue;
