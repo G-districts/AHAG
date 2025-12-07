@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Teacher · G School</title>
+  <link rel="icon" href="favicon.png" type="image/png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 
 <style>
@@ -996,6 +997,7 @@ $('#saveClass').onclick=async()=>{
   toast('Class settings updated');
 };
 $('#announceBtn').onclick = async ()=>{
+  const title = prompt('Announcement title','Announcement'); if(title===null) return;
   const message = prompt('Message'); if(message===null) return;
   showOverlay();
   try{
