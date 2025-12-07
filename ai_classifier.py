@@ -529,25 +529,14 @@ KEYWORDS = {
     ],
 
     # Restricted categories – kept empty (Option C)
-    "Sexual Content": [ "Bareback", "Bareback", "Big dick energy", "porn","xxx","xvideos","redtube","xnxx","brazzers","onlyfans","camgirl","pornhub", ahole
-Got it. You want the list formatted with a beginning quote mark, the word, and then an ending quote mark followed by a comma, like this: "Word",.
-
-Here is the complete list reformatted exactly as requested:
-
+    "Sexual Content": [ "Bareback", "Bareback", "Big dick energy", "porn","xxx","xvideos","redtube","xnxx","brazzers","onlyfans","camgirl","pornhub",
 "Fukk",
-
 "Fukkah",
-
 "Fukken",
-
 "Fukker",
-
 "Fukkin",
-
 "g00k",
-
 "gay",
-
 "gayboy",
 
 "gaygirl",
