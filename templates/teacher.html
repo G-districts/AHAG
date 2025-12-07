@@ -786,29 +786,18 @@ const state = {
    Load initial class data
 ----------------------------------------------------------- */
 const CLASS_ID = (window.CLASS_ID || '{{ class_id or "period1" }}');
-let CLASS_STUDENTS = [];
-
 async function loadData(){
   const j = await (await fetch('/api/data?class_id=' + encodeURIComponent(CLASS_ID))).json();
-  const cls = j.classes && (j.classes[CLASS_ID] || Object.values(j.classes)[0]) || {};
-  // Try to capture the roster for this class so we can limit
-  // all per-student views to just this class session.
-  let roster = [];
-  if (cls && Array.isArray(cls.students)) roster = cls.students;
-  else if (cls && Array.isArray(cls.roster)) roster = cls.roster;
-  else if (cls && Array.isArray(cls.emails)) roster = cls.emails;
-  else if (cls && cls.students && typeof cls.students === 'object') roster = Object.keys(cls.students);
-  else if (j && Array.isArray(j.students)) roster = j.students;
-  CLASS_STUDENTS = roster || [];
-
+  const cls = j.classes[CLASS_ID] || Object.values(j.classes)[0] || {};
   $('#focus').checked = !!cls.focus_mode; 
   $('#paused').checked = !!cls.paused;
-  $('#chatEnabled').checked = j.settings && j.settings.chat_enabled; 
+  $('#chatEnabled').checked = j.settings.chat_enabled; 
   $('#active').checked = !!cls.active;
   $('#classTitle').textContent = cls.name || 'Class Session';
   $('#updateTime').textContent = 'Update Time';
 }
 loadData();
+
 /* -----------------------------------------------------------
    Presence + Smart Screenshot Persistence
 ----------------------------------------------------------- */
@@ -819,7 +808,6 @@ async function refreshPresence(){
 
   // Merge live presence into cache
   Object.entries(pres).forEach(([student, info])=>{
-    if (CLASS_STUDENTS && CLASS_STUDENTS.length && !CLASS_STUDENTS.includes(student)) return;
     const existing = studentCache[student] || {tabshots:{}};
     const tabs = info.tabs || [];
     const openIds = new Set(tabs.map(t=> String(t.id)));
@@ -852,7 +840,6 @@ async function refreshPresence(){
 
   // Mark offline/inactive students
   for(const [student, cache] of Object.entries(studentCache)){
-    if (CLASS_STUDENTS && CLASS_STUDENTS.length && !CLASS_STUDENTS.includes(student)) continue;
     const seen = pres.hasOwnProperty(student);
     const inactive = (now - (cache.lastActive||0)) > 5*60*1000;
     if(!seen || inactive) setStudentCache(student, {offline:true});
@@ -860,17 +847,12 @@ async function refreshPresence(){
 
   // Render grid
   const grid = $('#screenGrid'); grid.innerHTML='';
-  let allIds;
-  if (CLASS_STUDENTS && CLASS_STUDENTS.length){
-    allIds = [...CLASS_STUDENTS];
-  }else{
-    allIds = Array.from(new Set([...Object.keys(studentCache), ...Object.keys(pres)])).sort();
-  }
+  const allIds = Array.from(new Set([...Object.keys(studentCache), ...Object.keys(pres)])).sort();
 
   allIds.forEach(student=>{
     const info = pres[student] || {};
     const cache = studentCache[student] || {};
-    const isOffline = !pres.hasOwnProperty(student) || !!cache.offline;
+    const isOffline = !!cache.offline;
 
     const card=document.createElement('div'); 
     card.className='card ' + (isOffline ? 'offline' : 'online');
@@ -1003,7 +985,33 @@ $('#saveClass').onclick=async()=>{
   await fetch('/api/class/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({class_id:CLASS_ID,active:$('#active').checked, chat_enabled:$('#chatEnabled').checked})});
   toast('Class settings updated');
 };
-$('#announceBtn').onclick=async()=>{ const msg=prompt('Announcement'); if(msg!=null){ await fetch('/api/announce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})}); toast('Announcement sent'); } };
+$('#announceBtn').onclick = async ()=>{
+  const title = prompt('Announcement title','Announcement'); if(title===null) return;
+  const message = prompt('Message'); if(message===null) return;
+  showOverlay();
+  try{
+    const res = await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID));
+    if(res.ok){
+      const pres = await res.json();
+      const ids = Object.keys(pres || {});
+      for(const student of ids){
+        await fetch(`/api/commands/${encodeURIComponent(student)}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({type:'announce', title, message})
+        });
+      }
+      toast('Announcement sent to class');
+    }else{
+      alert('Failed to load class roster for announcement');
+    }
+  }catch(e){
+    console.error('Announcement error', e);
+    alert('Failed to send announcement');
+  }finally{
+    hideOverlay();
+  }
+};
 $('#openTabsBtn').onclick=()=> $('#openTabsDlg').showModal();
 $('#openTabsClose').onclick=()=> $('#openTabsDlg').close();
 $('#openTabsSend').onclick=async()=>{
@@ -1059,37 +1067,32 @@ $('#pauseBtn').onclick = async ()=>{
 
 /* Notify */
 $('#notifyBtn').onclick = async ()=>{
-  const title = prompt('Notification title','Look at the teacher'); 
-  if (title === null) return;
-  const message = prompt('Message (optional)','Please look up at the teacher now.');
-  // Send a per-student notify command, limited to students in this class session.
-  let students = [];
+  const title = prompt('Notification title','Look at the teacher'); if(title===null) return;
+  const message = prompt('Message (optional)','Please look up at the teacher now.'); if(message===null) return;
+  showOverlay();
   try{
     const res = await fetch('/api/presence?class_id=' + encodeURIComponent(CLASS_ID));
-    if (res.ok){
+    if(res.ok){
       const pres = await res.json();
-      students = Object.keys(pres || {});
-      if (CLASS_STUDENTS && CLASS_STUDENTS.length){
-        students = students.filter(s => CLASS_STUDENTS.includes(s));
+      const ids = Object.keys(pres || {});
+      for(const student of ids){
+        await fetch(`/api/commands/${encodeURIComponent(student)}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({type:'notify', title, message})
+        });
       }
+      toast('Notification sent to class');
+    }else{
+      alert('Failed to load class roster for notify');
     }
   }catch(e){
-    console.error('notify presence error', e);
+    console.error('Notify error', e);
+    alert('Failed to send notification');
+  }finally{
+    hideOverlay();
   }
-  if (!students.length){
-    alert('No active students in this class right now.');
-    return;
-  }
-  await Promise.all(students.map(student=>{
-    return fetch('/api/commands/' + encodeURIComponent(student),{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({type:'notify', title, message})
-    });
-  }));
-  toast('Notification sent to class');
 };
-
 
 /* -----------------------------------------------------------
    Per-student controls (dialog)
