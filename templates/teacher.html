@@ -786,18 +786,29 @@ const state = {
    Load initial class data
 ----------------------------------------------------------- */
 const CLASS_ID = (window.CLASS_ID || '{{ class_id or "period1" }}');
+let CLASS_STUDENTS = [];
+
 async function loadData(){
   const j = await (await fetch('/api/data?class_id=' + encodeURIComponent(CLASS_ID))).json();
-  const cls = j.classes[CLASS_ID] || Object.values(j.classes)[0] || {};
+  const cls = j.classes && (j.classes[CLASS_ID] || Object.values(j.classes)[0]) || {};
+  // Try to capture the roster for this class so we can limit
+  // all per-student views to just this class session.
+  let roster = [];
+  if (cls && Array.isArray(cls.students)) roster = cls.students;
+  else if (cls && Array.isArray(cls.roster)) roster = cls.roster;
+  else if (cls && Array.isArray(cls.emails)) roster = cls.emails;
+  else if (cls && cls.students && typeof cls.students === 'object') roster = Object.keys(cls.students);
+  else if (j && Array.isArray(j.students)) roster = j.students;
+  CLASS_STUDENTS = roster || [];
+
   $('#focus').checked = !!cls.focus_mode; 
   $('#paused').checked = !!cls.paused;
-  $('#chatEnabled').checked = j.settings.chat_enabled; 
+  $('#chatEnabled').checked = j.settings && j.settings.chat_enabled; 
   $('#active').checked = !!cls.active;
   $('#classTitle').textContent = cls.name || 'Class Session';
   $('#updateTime').textContent = 'Update Time';
 }
 loadData();
-
 /* -----------------------------------------------------------
    Presence + Smart Screenshot Persistence
 ----------------------------------------------------------- */
@@ -808,6 +819,7 @@ async function refreshPresence(){
 
   // Merge live presence into cache
   Object.entries(pres).forEach(([student, info])=>{
+    if (CLASS_STUDENTS && CLASS_STUDENTS.length && !CLASS_STUDENTS.includes(student)) return;
     const existing = studentCache[student] || {tabshots:{}};
     const tabs = info.tabs || [];
     const openIds = new Set(tabs.map(t=> String(t.id)));
@@ -840,6 +852,7 @@ async function refreshPresence(){
 
   // Mark offline/inactive students
   for(const [student, cache] of Object.entries(studentCache)){
+    if (CLASS_STUDENTS && CLASS_STUDENTS.length && !CLASS_STUDENTS.includes(student)) continue;
     const seen = pres.hasOwnProperty(student);
     const inactive = (now - (cache.lastActive||0)) > 5*60*1000;
     if(!seen || inactive) setStudentCache(student, {offline:true});
@@ -847,12 +860,17 @@ async function refreshPresence(){
 
   // Render grid
   const grid = $('#screenGrid'); grid.innerHTML='';
-  const allIds = Array.from(new Set([...Object.keys(studentCache), ...Object.keys(pres)])).sort();
+  let allIds;
+  if (CLASS_STUDENTS && CLASS_STUDENTS.length){
+    allIds = [...CLASS_STUDENTS];
+  }else{
+    allIds = Array.from(new Set([...Object.keys(studentCache), ...Object.keys(pres)])).sort();
+  }
 
   allIds.forEach(student=>{
     const info = pres[student] || {};
     const cache = studentCache[student] || {};
-    const isOffline = !!cache.offline;
+    const isOffline = !pres.hasOwnProperty(student) || !!cache.offline;
 
     const card=document.createElement('div'); 
     card.className='card ' + (isOffline ? 'offline' : 'online');
@@ -986,7 +1004,6 @@ $('#saveClass').onclick=async()=>{
   toast('Class settings updated');
 };
 $('#announceBtn').onclick = async ()=>{
-  const title = prompt('Announcement'); if(title===null) return;
   const message = prompt('Message'); if(message===null) return;
   showOverlay();
   try{
@@ -1093,6 +1110,7 @@ $('#notifyBtn').onclick = async ()=>{
     hideOverlay();
   }
 };
+
 
 /* -----------------------------------------------------------
    Per-student controls (dialog)
