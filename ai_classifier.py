@@ -890,8 +890,6 @@ KEYWORDS = {
     "doubleclick",
     "adchoices",
     "googletagmanager.com", "gtm",
-
-    // ---- Added 50+ Advertising Brands & Networks ----
     "googleads.g.doubleclick.net", "googleads",
     "adroll.com", "adroll",
     "criteo.com", "criteo",
