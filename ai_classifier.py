@@ -86,10 +86,7 @@ KEYWORDS = {
     "snapchat.com", "snapchat",
     "tiktok.com", "tiktok",
     "telegram.org", "telegram",
-    "vk.com", "vk",
-
-    // ---- Added 50 Social Media Brands ----
-    "x.com", "twitter.com", "twitter", "x",
+    "vk.com", "vk",    "x.com", "twitter.com", "twitter", "x",
     "discord.com", "discord",
     "whatsapp.com", "whatsapp",
     "wechat.com", "wechat",
@@ -230,7 +227,6 @@ KEYWORDS = {
     "ubisoft.com", "ubisoft",
     "rockstargames.com", "rockstargames",
 
-    // ---- Added 50+ Gaming Brands & Platforms ----
     "activision.com", "activision",
     "bethesda.net", "bethesda",
     "cdprojekt.com", "cdprojekt",
@@ -301,7 +297,6 @@ KEYWORDS = {
     "nike.com",
     "adidas.com",
 
-    // ---- Added 50 Ecommerce brands ----
 
     "homedepot.com", "homedepot",
     "lowes.com", "lowes",
@@ -430,8 +425,6 @@ KEYWORDS = {
     "nsfw",
     "age-restricted",
     "18plus",
-
-    // ---- Added 50+ Restricted / Adult / Inappropriate Content Terms ----
     "adult",
     "porn",
     "xxx",
@@ -493,8 +486,6 @@ KEYWORDS = {
     "blackjack",
     "slotmachine",
     "slots",
-
-    // ---- Added 50+ Gambling Terms & Platforms ----
     "bingo",
     "lottery",
     "scratchcard",
@@ -558,8 +549,6 @@ KEYWORDS = {
     "cheatengine",
     "botnet",
     "rattool",
-
-    // ---- Added 50+ Malicious / Hacking / Illegal Keywords & Sites ----
     "phishing",
     "ransomware",
     "malware",
@@ -627,8 +616,6 @@ KEYWORDS = {
     "vodka",
     "whiskey",
     "tequila",
-
-    // ---- Added 50+ Drugs & Alcohol Terms / Brands ----
     "cocaine",
     "methamphetamine",
     "meth",
@@ -769,8 +756,6 @@ KEYWORDS = {
     "mit.edu",
     "stanford.edu",
     "harvard.edu",
-
-    // ---- Added 50+ General & Educational Sites ----
     "ocw.mit.edu", "mitocw",
     "saylor.org", "saylor",
     "futurelearn.com", "futurelearn",
@@ -834,8 +819,6 @@ KEYWORDS = {
     "mlb.com", "mlb",
     "nhl.com", "nhl",
     "fifa.com", "fifa",
-
-    // ---- Added 50+ Sports & Hobbies Sites ----
     "uefa.com", "uefa",
     "premierleague.com", "premierleague",
     "ligue1.com", "ligue1",
@@ -969,8 +952,6 @@ KEYWORDS = {
     "medium.com", "medium",
     "wattpad.com", "wattpad",
     "substack.com", "substack",
-
-    // ---- Added 50+ Blogging Platforms & Content Sites ----
     "tumblr.com", "tumblr",
     "ghost.org", "ghost",
     "typepad.com", "typepad",
@@ -1064,9 +1045,6 @@ KEYWORDS = {
     "quran.com",
     "biblehub.com",
 
-    // ---- Added Major Religion Websites & Organizations ----
-
-    // Christianity
     "bible.com", "youversion",
     "blueletterbible.org",
     "christianity.com",
@@ -1080,21 +1058,19 @@ KEYWORDS = {
     "crosswalk.com",
     "gotquestions.org",
 
-    // Judaism
+    
     "chabad.org",
     "myjewishlearning.com",
     "aish.com",
     "sefaria.org",
     "jewishvirtuallibrary.org",
 
-    // Islam
     "islamqa.info",
     "islamicity.org",
     "islamicfinder.org",
     "muslimpro.com",
     "sunnah.com",
 
-    // Buddhism
     "buddhanet.net",
     "dharmanet.org",
     "thubtenchodron.org",
@@ -1108,33 +1084,26 @@ KEYWORDS = {
     "vedabase.io",
     "chinmayamission.com",
 
-    // Sikhism
     "sikhnet.com",
     "sgpc.net",
     "sikhs.org",
     "damdamitaksal.org",
 
-    // Other World Religions & Study Sources
     "bahai.org",
     "neopagan.net",
     "wicca.com",
     "scientology.org",
     "unification.org",
 
-    // Interfaith / General Study
     "religionnews.com",
     "religionfacts.com",
     "patheos.com",
     "beliefnet.com",
-
-    // Scriptures / Reference
     "studylight.org",
     "scriptures.lds.org",
-    "churchofjesuschrist.org",  // Latter-day Saints official site
-    "watchtower.org",           // Jehovah’s Witness reference
-    "jw.org",                   // Jehovah’s Witness official site
-
-    // Apps / Tools
+    "churchofjesuschrist.org",  
+    "watchtower.org",          
+    "jw.org",                  
     "al-islam.org",
     "biblia.com",
     "logos.com",
@@ -1158,8 +1127,6 @@ KEYWORDS = {
     "imdb.com", "imdb",
     "rottentomatoes.com",
     "fandom.com", "fandom",
-
-    // ---- Added 50 Entertainment Brands ----
 
     "metacritic.com", "metacritic",
     "letterboxd.com", "letterboxd",
@@ -1219,8 +1186,6 @@ KEYWORDS = {
     # ------------------------------------------------------
 "Built-in Apps": [
 
-    // ---- Chrome OS Built-in App URLs ----
-
     "chrome://calculator",
     "chrome://camera",
     "chrome://calendar",
@@ -1246,8 +1211,6 @@ KEYWORDS = {
     "chrome://terms",
     "chrome://usb",
     "chrome://wallpaper",
-
-    // ---- Additional ChromeOS System Pages ----
 
     "chrome://accessibility",
     "chrome://app-service-internals",
@@ -1285,9 +1248,6 @@ KEYWORDS = {
     "chrome://usb-internals",
     "chrome://version",
     "chrome://webrtc-internals",
-
-    // ---- Chrome Untrusted WebUI Apps (ChromeOS System Apps) ----
-
     "chrome-untrusted://camera-app",
     "chrome-untrusted://media-app",
     "chrome-untrusted://projector",
@@ -1295,9 +1255,6 @@ KEYWORDS = {
     "chrome-untrusted://diagnostics",
     "chrome-untrusted://files",
     "chrome-untrusted://crosh",
-
-    // ---- Chrome Canvas ----
-    // The Chrome Canvas app is a standalone Google Web App:
     "https://canvas.apps.chrome",
     "canvas.apps.chrome",
     "canvas.google.com",
@@ -1310,7 +1267,7 @@ KEYWORDS = {
     # ------------------------------------------------------
     "Sexual Content": [
         "porn",
-        "pornhub",  # still a strong indicator if seen
+        "pornhub",  
         "xxx",
         "onlyfans",
         "nsfw",
@@ -1458,10 +1415,3 @@ def classify(url: str, html: str = None):
         "host": host,
     }
 
-# Quick tests if you run this file directly
-if __name__ == "__main__":
-    print("Minecraft:", classify("https://www.minecraft.net/en-us"))
-    print("Roblox:", classify("https://www.roblox.com"))
-    print("YouTube:", classify("https://www.youtube.com"))
-    print("Khan Academy:", classify("https://www.khanacademy.org"))
-    print("Random news site:", classify("https://www.bbc.com/news"))
