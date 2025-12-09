@@ -4,7 +4,7 @@ from html import unescape
 # ==========================================================
 # FEATURE TOGGLES
 # ==========================================================
-ENABLE_ALWAYS_BLOCK = True  # Toggle high-risk social media
+ENABLE_ALWAYS_BLOCK = True   # Toggle high-risk social media
 ENABLE_ALLOW_ONLY_MODE = False  # Only allow 'Allow only' sites (used outside classify)
 ENABLE_GLOBAL_BLOCK_ALL = False  # Block all non-categorized sites (used outside classify)
 
@@ -299,34 +299,41 @@ def classify(url: str, html: str = None):
             return {"category": "Always Block Social Media", "confidence": 1.0, "domain": domain, "host": host}
 
     # Build tokens (URL / host / domain / body)
-    tokens = [normalize(url), normalize(host), normalize(domain)]
-    body = _textify(html) if html else _textify(_fetch_html(url))
-    if body:
-        tokens.append(body)
+    url_norm = normalize(url)
+    host_norm = normalize(host)
+    domain_norm = normalize(domain)
+    tokens = [url_norm, host_norm, domain_norm]
+    body_norm = _textify(html) if html else _textify(_fetch_html(url))
+    if body_norm:
+        tokens.append(body_norm)
 
     # ======================================================
     # Score each category (keywords + similarity seeds)
     # ======================================================
     scores = {c: 0 for c in CATEGORIES}
 
-    # 1) keyword-based scoring (original style)
+    # 1) keyword-based scoring with heavier URL/host/domain weight
     for cat, kws in KEYWORDS.items():
         for kw in kws:
             kwn = normalize(kw)
             if not kwn:
                 continue
-            for t in tokens:
+            for i, t in enumerate(tokens):
                 if kwn in t:
-                    scores[cat] += 1
+                    if i <= 2:
+                        # Strong signal: in URL / host / domain
+                        scores[cat] += 5
+                    else:
+                        # Weak signal: in body text
+                        scores[cat] += 1
 
-    # 2) similarity-based scoring
-    all_text = " ".join(tokens)
-    all_tokens = set(_tokenize(all_text))
+    # 2) similarity-based scoring (only on body text)
+    body_tokens = set(_tokenize(body_norm)) if body_norm else set()
 
     for cat, seeds in SIMILARITY_SEEDS.items():
         matches = 0
         for seed in seeds:
-            if seed in all_tokens:
+            if seed in body_tokens:
                 matches += 1
         if matches > 0:
             scores[cat] += matches * 2
@@ -357,6 +364,8 @@ def classify(url: str, html: str = None):
 
 
 if __name__ == "__main__":
+    # These prints are just for testing in a terminal
+    print("Minecraft:", classify("https://www.minecraft.net/en-us"))
     print("Roblox:", classify("https://www.roblox.com"))
     print("Random game-like text:", classify("https://example.com", html="<title>Play free online games</title>"))
     print("Random shop:", classify("https://example.com/shop", html="<h1>Add to cart and checkout</h1>"))
