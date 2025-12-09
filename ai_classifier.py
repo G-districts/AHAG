@@ -56,7 +56,7 @@ KEYWORDS = {
         "x.com", "twitter.com", "twitter",
         "bereal.com", "bereal", "be.real",
         "temu.com", "temu",
-    ],
+    ]
 
     # ------------------------------------------------------
     # Social Media (brand-based)
@@ -125,7 +125,7 @@ KEYWORDS = {
     "untappd.com", "untappd",
     "ameblo.jp", "ameblo",
     "livejournal.com", "livejournal"
-],
+]
 
 
     # ------------------------------------------------------
@@ -190,7 +190,7 @@ KEYWORDS = {
     "toonator.ai", "toonator",
     "genmo.ai", "genmo",
     "wondercraft.ai", "wondercraft"
-],
+]
 
 
     # ------------------------------------------------------
