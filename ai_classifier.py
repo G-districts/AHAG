@@ -51,7 +51,7 @@ KEYWORDS = {
     "gpt4all.io", 
     "mistral.ai", 
     "tabnine.com", "tabnine",
-  , "deepmind",
+   "deepmind",
     "cognosys.ai", "cognosys",
     "character.ai", "characterai",
     "blackbox.ai", "blackbox",
@@ -87,7 +87,7 @@ KEYWORDS = {
     "genmo.ai", "genmo",
     "wondercraft.ai", "wondercraft"],
     "Social Media": [ "insta",
- "facebook"
+ "facebook",
     "meta",
    "reddit",
   "tumblr",
@@ -111,7 +111,7 @@ KEYWORDS = {
     "gab.com",
     "truth social",
     "parler.com",
-    "gettr.com"
+    "gettr.com",
     "flickr.com",
     "vimeo",
   "dailymotion",
