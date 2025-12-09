@@ -40,19 +40,6 @@ CATEGORIES = [
     "Global Block All",
 ]
 
-# Domains that should *always* be treated as Games (Roblox)
-ROBLOX_DOMAINS = {
-    "roblox.com",
-    "rbxcdn.com",
-    "rbx.com",
-    "robloxstudio.com",
-}
-
-# Optional: domains you always want treated as "Always Block Social Media"
-ALWAYS_BLOCK_DOMAINS = {
-    # "discord.com",
-    # "tiktok.com",
-}
 
 # ==========================================================
 # HIGHLY SPECIFIC KEYWORDS PER CATEGORY
@@ -348,7 +335,7 @@ KEYWORDS = {
     "ubereats.com", "ubereats store",
     "grubhub.com", "grubhub",
     "alibaba.com", "alibaba"
-],
+]
 
 
     # ------------------------------------------------------
@@ -415,7 +402,7 @@ KEYWORDS = {
     "nhl.com/tv", "nhltv",
     "ufc.tv", "ufc",
     "wwe.com/network", "wwenetwork"
-],
+]
 
 
     # ------------------------------------------------------
@@ -471,7 +458,7 @@ KEYWORDS = {
     "brazzers.com", "brazzers",
     "xart.com", "xart",
     "sex.com", "sex",
-]
+],
 
 
     # ------------------------------------------------------
@@ -737,7 +724,7 @@ KEYWORDS = {
     "figjam.com", "figjam",
     "kahoot.com", "kahoot",
     "mentimeter.com", "mentimeter"
-],
+]
 
 
     # ------------------------------------------------------
@@ -867,7 +854,7 @@ KEYWORDS = {
     "surfline.com", "surfline",
     "skateparkoftampa.com", "skateparkoftampa",
     "ultimatefrisbee.com", "ultimatefrisbee"
-],
+]
 
 
     # ------------------------------------------------------
@@ -879,7 +866,7 @@ KEYWORDS = {
         "microsoft.com/store",
         "store.steampowered.com",
         "epicgames.com/store",
-    ],
+    ]
 
     # ------------------------------------------------------
     # Advertising (specific ad tech)
@@ -1075,7 +1062,6 @@ KEYWORDS = {
     "plumvillage.org",
     "dalailama.com",
 
-    // Hinduism
     "hindupedia.com",
     "isha.sadhguru.org",
     "bharatpedia.org",
@@ -1106,7 +1092,7 @@ KEYWORDS = {
     "biblia.com",
     "logos.com",
     "accordancebible.com"
-],
+]
 
 
     # ------------------------------------------------------
@@ -1116,7 +1102,7 @@ KEYWORDS = {
         "ammunition",
         "gunshop",
         "tacticalgear",
-    ],
+    ]
 
     # ------------------------------------------------------
     # Entertainment (brand-based)
@@ -1176,7 +1162,7 @@ KEYWORDS = {
     "comicvine.gamespot.com", "comicvine",
     "myanimelist.net", "myanimelist",
     "animenewsnetwork.com", "animenewsnetwork"
-],
+]
 
 
     # ------------------------------------------------------
@@ -1256,7 +1242,7 @@ KEYWORDS = {
     "https://canvas.apps.chrome",
     "canvas.apps.chrome",
     "canvas.google.com",
-],
+]
 
 
 
@@ -1269,7 +1255,7 @@ KEYWORDS = {
         "xxx",
         "onlyfans",
         "nsfw",
-    ],
+    ]
 
     # ------------------------------------------------------
     # Allow only (school / allowed)
@@ -1280,7 +1266,7 @@ KEYWORDS = {
         "schoology.com",
         "googleclassroom",
         "classroom.google.com",
-    ],
+    ]
 }
 
 # Make sure every category in CATEGORIES has an entry in KEYWORDS
