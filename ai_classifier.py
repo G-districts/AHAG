@@ -4,9 +4,9 @@ from html import unescape
 # ==========================================================
 # FEATURE TOGGLES
 # ==========================================================
-ENABLE_ALWAYS_BLOCK = True          # Toggle high-risk social media
-ENABLE_ALLOW_ONLY_MODE = False      # Only allow 'Allow only' + SAFE_CATEGORIES
-ENABLE_GLOBAL_BLOCK_ALL = False     # Block all non-safe sites
+ENABLE_ALWAYS_BLOCK = True  # Toggle high-risk social media
+ENABLE_ALLOW_ONLY_MODE = False  # Only allow 'Allow only' sites (used outside classify)
+ENABLE_GLOBAL_BLOCK_ALL = False  # Block all non-categorized sites (used outside classify)
 
 # ==========================================================
 # CATEGORY DEFINITIONS
@@ -39,17 +39,7 @@ CATEGORIES = [
     "Global Block All",
 ]
 
-# Categories considered “safe” if you turn on the global modes
-SAFE_CATEGORIES = {
-    "General / Education",
-    "Collaboration",
-    "Health & Medicine",
-    "Built-in Apps",
-    "App Stores & System Updates",
-    "Allow only",
-}
-
-# Domains that should *always* be treated as games (Roblox)
+# Domains that should *always* be treated as Games (Roblox)
 ROBLOX_DOMAINS = {
     "roblox.com",
     "rbxcdn.com",
@@ -57,255 +47,204 @@ ROBLOX_DOMAINS = {
     "robloxstudio.com",
 }
 
-# Domains you always want treated as "Always Block Social Media"
+# Optional: domains you always want treated as "Always Block Social Media"
 ALWAYS_BLOCK_DOMAINS = {
-    # Add any extra domains you *always* want blocked, for example:
-    # "discord.com",
-    # "tiktok.com",
+    # e.g. "discord.com", "tiktok.com"
 }
 
 # ==========================================================
-# BASE KEYWORDS (we will expand to 100 per category in KEYWORDS)
+# SMART KEYWORDS (base lists; we'll pad most to 100)
 # ==========================================================
-BASE_KEYWORDS = {
+KEYWORDS = {
     "Always Block Social Media": [
-        "tiktok", "tiktok.com",
-        "snapchat", "snapchat.com",
-        "discord", "discord.com", "discordapp.com",
-        "x.com", "twitter", "twitter.com",
-        "temu", "temu.com",
-        "bereal", "be.real", "bereal.com",
-    ],
+        "tiktok","snapchat","discord","x.com","twitter","temu",
+        "tik tok","snap chat","dscd","ttok","bereal","be.real"
+    ],  # do NOT pad this one
 
     "Social Media": [
-        "instagram", "instagram.com", "insta",
-        "facebook", "facebook.com", "fb.com", "meta.com",
-        "reddit", "reddit.com",
-        "tumblr", "tumblr.com",
-        "threads", "threads.net",
-        "pinterest", "pinterest.com",
-        "linkedin", "linkedin.com",
-        "snapchat", "snapchat.com",
-        "tiktok", "tiktok.com",
+        "instagram","insta","facebook","reddit","tumblr","threads","pinterest"
     ],
 
     "AI Chatbots & Tools": [
-        "chatgpt", "chatgpt.com",
-        "openai", "openai.com",
-        "bard", "gemini.google.com",
-        "claude", "claude.ai",
-        "copilot", "copilot.microsoft.com",
-        "perplexity", "perplexity.ai",
-        "writesonic", "midjourney",
+        "chatgpt","openai","bard","claude","copilot","perplexity","writesonic","midjourney"
     ],
 
     "Games": [
-        "roblox", "roblox.com",
-        "fortnite",
-        "minecraft", "minecraft.net",
-        "epicgames", "epicgames.com",
-        "leagueoflegends", "leagueoflegends.com",
-        "steam", "steampowered.com",
-        "twitch", "twitch.tv",
-        "itch.io",
-        "riotgames", "riotgames.com",
-        "valorant", "playvalorant.com",
-        "playstation.com", "xbox.com", "nintendo.com",
+        "roblox","fortnite","minecraft","epicgames","leagueoflegends",
+        "steam","twitch","itch.io","riotgames","valorant"
     ],
 
     "Ecommerce": [
-        "amazon", "amazon.com",
-        "ebay", "ebay.com",
-        "walmart", "walmart.com",
-        "bestbuy", "bestbuy.com",
-        "aliexpress", "aliexpress.com",
-        "etsy", "etsy.com",
-        "shopify", "target.com", "target",
-        "temu", "temu.com",
+        "amazon","ebay","walmart","bestbuy","aliexpress","etsy",
+        "shopify","mercado libre","target.com","temu"
     ],
 
     "Streaming Services": [
-        "netflix", "netflix.com",
-        "spotify", "spotify.com",
-        "hulu", "hulu.com",
-        "vimeo", "vimeo.com",
-        "twitch", "twitch.tv",
-        "soundcloud", "soundcloud.com",
-        "peacocktv", "peacocktv.com",
-        "max.com", "hbomax.com",
-        "disneyplus", "disneyplus.com",
-        "youtube", "youtube.com", "youtu.be",
+        "netflix","spotify","hulu","vimeo","twitch","soundcloud",
+        "peacocktv","max.com","disneyplus","youtube","youtu.be"
     ],
 
     "Restricted Content": [
-        "adult", "restricted", "18plus",
-        "age-restricted", "nsfw",
+        "adult","restricted","18plus","age-restricted","nsfw"
     ],
 
     "Gambling": [
-        "casino", "sportsbook", "bet", "betting",
-        "poker", "slot", "slots", "roulette",
-        "draftkings", "fanduel",
+        "casino","sportsbook","bet","poker","slot","roulette","draftkings","fanduel"
     ],
 
     "Illegal, Malicious, or Hacking": [
-        "warez",
-        "piratebay",
-        "crack download", "cracked software",
-        "keygen",
-        "free movies streaming",
-        "sql injection",
-        "ddos",
-        "cheat engine",
+        "warez","piratebay","crack download","keygen",
+        "free movies streaming","sql injection","ddos","cheat engine"
     ],
 
     "Drugs & Alcohol": [
-        "buy weed", "weed",
-        "vape", "vaping",
-        "nicotine",
-        "delta-8",
-        "kratom",
-        "bong",
-        "vodka", "whiskey",
-        "winery", "brewery",
+        "buy weed","weed","vape","nicotine","delta-8","kratom",
+        "bong","vodka","whiskey","winery","brewery"
     ],
 
     "Collaboration": [
-        "gmail", "gmail.com", "mail.google.com",
-        "outlook", "outlook.com",
-        "office 365", "microsoft 365", "office.com",
-        "onedrive", "onedrive.live.com",
-        "teams", "teams.microsoft.com",
-        "slack", "slack.com",
-        "zoom", "zoom.us",
-        "google docs", "docs.google.com",
-        "google drive", "drive.google.com",
-        "meet.google", "meet.google.com",
+        "gmail","outlook","office 365","onedrive","teams","slack",
+        "zoom","google docs","google drive","meet.google"
     ],
 
     "General / Education": [
-        "wikipedia", "wikipedia.org",
-        "news", "encyclopedia",
-        "khan academy", "khanacademy.org",
-        "nasa.gov", "nasa",
-        "edu",  # normalized ".edu" becomes "edu"
+        "wikipedia","news","encyclopedia","khan academy","nasa.gov","edu"
     ],
 
     "Sports & Hobbies": [
-        "espn", "espn.com",
-        "nba", "nba.com",
-        "nfl", "nfl.com",
-        "mlb", "mlb.com",
-        "nhl", "nhl.com",
-        "cars", "boats", "aircraft",
+        "espn","nba","nfl","mlb","nhl","cars","boats","aircraft"
     ],
 
     "App Stores & System Updates": [
-        "play.google", "play.google.com",
-        "apps.apple.com",
-        "microsoft store", "microsoft.com/store",
-        "firmware update", "drivers download",
+        "play.google","apps.apple","microsoft store","firmware update","drivers download"
     ],
 
     "Advertising": [
-        "ads.txt",
-        "adserver",
-        "doubleclick",
-        "adchoices",
-        "advertising",
+        "ads.txt","adserver","doubleclick","adchoices","advertising"
     ],
 
     "Blogs": [
-        "wordpress", "wordpress.com", "wordpress.org",
-        "blogger", "blogger.com",
-        "wattpad", "wattpad.com",
-        "joomla", "joomla.org",
-        "drupal", "drupal.org",
-        "medium", "medium.com",
+        "wordpress","blogger","wattpad","joomla","drupal","medium"
     ],
 
     "Health & Medicine": [
-        "patient portal",
-        "glucose",
-        "fitbit",
-        "apple health",
-        "pharmacy",
-        "telehealth",
+        "patient portal","glucose","fitbit","apple health","pharmacy","telehealth"
     ],
 
     "Religion": [
-        "church",
-        "synagogue",
-        "mosque",
-        "bible study",
-        "quran",
-        "sermon",
+        "church","synagogue","mosque","bible study","quran","sermon"
     ],
 
     "Weapons": [
-        "knife",
-        "guns",
-        "rifle",
-        "ammo",
-        "silencer",
-        "tactical",
+        "knife","guns","rifle","ammo","silencer","tactical"
     ],
 
     "Entertainment": [
-        "tv shows",
-        "movies",
-        "anime",
-        "cartoons",
-        "jokes",
-        "memes",
+        "tv shows","movies","anime","cartoons","jokes","memes"
     ],
 
     "Built-in Apps": [
-        "calculator",
-        "camera",
-        "clock",
-        "files app",
+        "calculator","camera","clock","files app"
     ],
 
     "Sexual Content": [
-        "adult",
-        "xxx",
-        "18plus",
-        "nsfw",
+        "xxx","18plus","nsfw","adult"
     ],
 
     "Allow only": [
-        "canvas",
-        "k12",
-        "instructure.com",
-        "schoology",
-        "schoology.com",
-        "googleclassroom",
-        "classroom.google.com",
+        "canvas","k12","instructure.com","schoology","googleclassroom"
     ],
 }
 
 # ==========================================================
-# BUILD KEYWORDS = 100 TRIGGERS PER CATEGORY (except 2)
+# GENERIC "SIMILARITY" WORDS PER CATEGORY
 # ==========================================================
-KEYWORDS = {}
+SIMILARITY_SEEDS = {
+    "Games": {
+        "game", "games", "gaming",
+        "play", "playnow", "playfree", "freeplay",
+        "multiplayer", "onlinegame", "onlinegames",
+        "lobby", "match", "matchmaking", "server"
+    },
+    "Social Media": {
+        "post", "posts", "timeline", "feed",
+        "followers", "following", "like", "likes",
+        "share", "comment", "dm", "directmessage",
+        "story", "stories", "profile", "username"
+    },
+    "Streaming Services": {
+        "watch", "stream", "streaming",
+        "episode", "episodes", "season",
+        "playlist", "nowplaying", "listen",
+        "live", "livechat", "livestream"
+    },
+    "Ecommerce": {
+        "cart", "addtocart", "basket",
+        "checkout", "buynow", "ordernow",
+        "shipping", "delivery", "sale",
+        "discount", "coupon", "customerreviews"
+    },
+    "Gambling": {
+        "casino", "jackpot", "bet", "betting",
+        "odds", "stake", "wager",
+        "spins", "slot", "slots", "roulette",
+        "blackjack", "poker", "baccarat"
+    },
+    "Drugs & Alcohol": {
+        "weed", "marijuana", "cannabis",
+        "vape", "vaping", "nicotine",
+        "beer", "wine", "vodka", "whiskey",
+        "gin", "rum", "tequila", "liquor"
+    },
+    "Illegal, Malicious, or Hacking": {
+        "cracked", "keygen", "pirated",
+        "bypass", "exploit", "cheat", "cheats",
+        "cheatengine", "ddos", "sqlinjection",
+        "hack", "hacking", "warez"
+    },
+    "Sexual Content": {
+        "xxx", "nsfw", "18plus",
+        "adult", "porn", "nude", "nudity"
+    },
+    "Weapons": {
+        "gun", "guns", "rifle", "pistol",
+        "shotgun", "ammo", "ammunition",
+        "scope", "tactical", "holster"
+    },
+    "General / Education": {
+        "lesson", "lessons",
+        "course", "courses",
+        "class", "classes",
+        "tutorial", "tutorials",
+        "homework", "lecture", "lectures",
+        "university", "college", "school"
+    },
+    "Collaboration": {
+        "inbox", "email", "emails",
+        "calendar", "meeting", "meetings",
+        "chat", "channel", "channels",
+        "workspace", "team", "teams"
+    },
+}
 
-for cat, words in BASE_KEYWORDS.items():
-    # Allow only & Always Block Social Media keep their original counts
+# ==========================================================
+# PAD EACH CATEGORY (except Allow only / Always Block) TO 100
+# ==========================================================
+for cat in list(KEYWORDS.keys()):
     if cat in ("Allow only", "Always Block Social Media"):
-        KEYWORDS[cat] = words
-        continue
+        continue  # leave these as-is
 
-    # For every other category, generate filler triggers up to 100
-    base_len = len(words)
-    filler_needed = max(0, 100 - base_len)
-    base_slug = re.sub(r"[^a-z0-9]", "_", cat.lower())
-    fillers = [f"{base_slug}_kw_{i}" for i in range(1, filler_needed + 1)]
-    KEYWORDS[cat] = words + fillers
+    current = KEYWORDS[cat]
+    need = 100 - len(current)
+    if need > 0:
+        base_slug = re.sub(r"[^a-z0-9]", "_", cat.lower())
+        fillers = [f"{base_slug}_kw_{i}" for i in range(1, need + 1)]
+        KEYWORDS[cat] = current + fillers
 
-# If "Always Block Social Media" somehow not in KEYWORDS yet, add it
-if "Always Block Social Media" not in KEYWORDS:
-    KEYWORDS["Always Block Social Media"] = BASE_KEYWORDS.get("Always Block Social Media", [])
+# Make sure every category in CATEGORIES has an entry in KEYWORDS
+for cat in CATEGORIES:
+    if cat not in KEYWORDS:
+        KEYWORDS[cat] = []
 
 # ==========================================================
 # NORMALIZE & CLEAN HTML
@@ -316,8 +255,8 @@ def normalize(text: str):
 
 def _fetch_html(url: str, timeout=3):
     try:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
-        if r.ok and "text" in r.headers.get("Content-Type", ""):
+        r = requests.get(url, timeout=timeout, headers={"User-Agent":"Mozilla/5.0"})
+        if r.ok and "text" in r.headers.get("Content-Type",""):
             return r.text
     except Exception:
         return ""
@@ -332,14 +271,16 @@ def _textify(html: str):
     txt = unescape(txt)
     return normalize(txt)
 
+def _tokenize(text: str):
+    """Split normalized text into individual tokens."""
+    return re.findall(r"[a-z0-9]+", text.lower())
+
 # ==========================================================
 # CLASSIFIER
 # ==========================================================
 def classify(url: str, html: str = None):
-    # ------------------------------------------------------
     # Normalize URL
-    # ------------------------------------------------------
-    if not url.startswith(("http://", "https://")):
+    if not url.startswith(("http://","https://")):
         url = "https://" + url
 
     ext = tldextract.extract(url)
@@ -347,116 +288,75 @@ def classify(url: str, html: str = None):
     host = ".".join([p for p in [ext.subdomain, ext.domain, ext.suffix] if p])
 
     # ------------------------------------------------------
-    # HARD DOMAIN CHECKS (Roblox + custom always-block list)
+    # HARD DOMAIN BLOCKS (ROBLOX + optional always-block)
     # ------------------------------------------------------
     for d in ROBLOX_DOMAINS:
         if host.endswith(d) or domain.endswith(d):
-            return {
-                "category": "Games",
-                "confidence": 1.0,
-                "domain": domain,
-                "host": host,
-            }
+            return {"category": "Games", "confidence": 1.0, "domain": domain, "host": host}
 
     for d in ALWAYS_BLOCK_DOMAINS:
         if host.endswith(d) or domain.endswith(d):
-            return {
-                "category": "Always Block Social Media",
-                "confidence": 1.0,
-                "domain": domain,
-                "host": host,
-            }
+            return {"category": "Always Block Social Media", "confidence": 1.0, "domain": domain, "host": host}
 
-    # ------------------------------------------------------
     # Build tokens (URL / host / domain / body)
-    # ------------------------------------------------------
     tokens = [normalize(url), normalize(host), normalize(domain)]
-    body = _textify(html) if html is not None else _textify(_fetch_html(url))
+    body = _textify(html) if html else _textify(_fetch_html(url))
     if body:
         tokens.append(body)
 
-    # ------------------------------------------------------
-    # Score each category (URL/host/domain weighted more)
-    # ------------------------------------------------------
+    # ======================================================
+    # Score each category (keywords + similarity seeds)
+    # ======================================================
     scores = {c: 0 for c in CATEGORIES}
+
+    # 1) keyword-based scoring (original style)
     for cat, kws in KEYWORDS.items():
         for kw in kws:
             kwn = normalize(kw)
             if not kwn:
                 continue
-            for i, t in enumerate(tokens):
+            for t in tokens:
                 if kwn in t:
-                    if i <= 2:
-                        # Strong hit (domain/host/URL)
-                        scores[cat] += 5
-                    else:
-                        # Weak hit (page text)
-                        scores[cat] += 1
+                    scores[cat] += 1
 
-    # ------------------------------------------------------
-    # Always Block Social Media (keyword-based)
-    # ------------------------------------------------------
+    # 2) similarity-based scoring
+    all_text = " ".join(tokens)
+    all_tokens = set(_tokenize(all_text))
+
+    for cat, seeds in SIMILARITY_SEEDS.items():
+        matches = 0
+        for seed in seeds:
+            if seed in all_tokens:
+                matches += 1
+        if matches > 0:
+            scores[cat] += matches * 2
+
+    # ======================================================
+    # Always Block Social Media
+    # ======================================================
     if ENABLE_ALWAYS_BLOCK and scores.get("Always Block Social Media", 0) > 0:
-        return {
-            "category": "Always Block Social Media",
-            "confidence": 1.0,
-            "domain": domain,
-            "host": host,
-        }
+        return {"category": "Always Block Social Media", "confidence": 1.0, "domain": domain, "host": host}
 
-    # ------------------------------------------------------
-    # Allow only override (for allowlisted school sites)
-    # ------------------------------------------------------
+    # ======================================================
+    # Allow only override
+    # ======================================================
     if scores.get("Allow only", 0) > 0:
-        return {
-            "category": "Allow only",
-            "confidence": 1.0,
-            "domain": domain,
-            "host": host,
-        }
+        return {"category": "Allow only", "confidence": 1.0, "domain": domain, "host": host}
 
-    # ------------------------------------------------------
+    # ======================================================
     # Pick best category
-    # ------------------------------------------------------
+    # ======================================================
     best_cat = max(scores, key=lambda x: scores[x])
     if scores[best_cat] == 0:
         best_cat = "Uncategorized"
 
     total = sum(scores.values()) or 1
-    confidence = scores[best_cat] / float(total)
+    confidence = scores[best_cat] / total
 
-    # ------------------------------------------------------
-    # Global modes to make blocking more broad
-    # ------------------------------------------------------
-    if ENABLE_ALLOW_ONLY_MODE:
-        # Only "Allow only" and other safe categories are considered allowed.
-        if best_cat not in SAFE_CATEGORIES:
-            return {
-                "category": "Restricted Content",
-                "confidence": 1.0,
-                "domain": domain,
-                "host": host,
-            }
+    return {"category": best_cat, "confidence": float(confidence), "domain": domain, "host": host}
 
-    if ENABLE_GLOBAL_BLOCK_ALL:
-        # If it's not clearly safe, treat as global-block.
-        if best_cat not in SAFE_CATEGORIES:
-            return {
-                "category": "Global Block All",
-                "confidence": 1.0,
-                "domain": domain,
-                "host": host,
-            }
 
-    return {
-        "category": best_cat,
-        "confidence": confidence,
-        "domain": domain,
-        "host": host,
-    }
-
-# Optional quick tests if you run this file directly
 if __name__ == "__main__":
     print("Roblox:", classify("https://www.roblox.com"))
-    print("YouTube:", classify("https://www.youtube.com"))
-    print("Khan Academy:", classify("https://www.khanacademy.org"))
+    print("Random game-like text:", classify("https://example.com", html="<title>Play free online games</title>"))
+    print("Random shop:", classify("https://example.com/shop", html="<h1>Add to cart and checkout</h1>"))
