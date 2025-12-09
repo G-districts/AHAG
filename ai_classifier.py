@@ -4,9 +4,9 @@ from html import unescape
 # ==========================================================
 # FEATURE TOGGLES
 # ==========================================================
-ENABLE_ALWAYS_BLOCK = True   # Toggle high-risk social media
-ENABLE_ALLOW_ONLY_MODE = False  # Only allow 'Allow only' sites (used outside classify)
-ENABLE_GLOBAL_BLOCK_ALL = False  # Block all non-categorized sites (used outside classify)
+ENABLE_ALWAYS_BLOCK = True          # Toggle high-risk social media
+ENABLE_ALLOW_ONLY_MODE = False      # Only allow 'Allow only' sites (used outside classify)
+ENABLE_GLOBAL_BLOCK_ALL = False     # Block all non-categorized sites (used outside classify)
 
 # ==========================================================
 # CATEGORY DEFINITIONS
@@ -49,197 +49,331 @@ ROBLOX_DOMAINS = {
 
 # Optional: domains you always want treated as "Always Block Social Media"
 ALWAYS_BLOCK_DOMAINS = {
-    # e.g. "discord.com", "tiktok.com"
+    # "discord.com",
+    # "tiktok.com",
 }
 
 # ==========================================================
-# SMART KEYWORDS (base lists; we'll pad most to 100)
+# HIGHLY SPECIFIC KEYWORDS PER CATEGORY
+# (mostly brands / domains, very few generic words)
 # ==========================================================
 KEYWORDS = {
+    # ------------------------------------------------------
+    # Strong always-block social media (small + specific)
+    # ------------------------------------------------------
     "Always Block Social Media": [
-        "tiktok","snapchat","discord","x.com","twitter","temu",
-        "tik tok","snap chat","dscd","ttok","bereal","be.real"
-    ],  # do NOT pad this one
+        "tiktok.com", "tiktok",
+        "snapchat.com", "snapchat",
+        "discord.com", "discordapp.com", "discord",
+        "x.com", "twitter.com", "twitter",
+        "bereal.com", "bereal", "be.real",
+        "temu.com", "temu",
+    ],
 
+    # ------------------------------------------------------
+    # Social Media (brand-based)
+    # ------------------------------------------------------
     "Social Media": [
-        "instagram","insta","facebook","reddit","tumblr","threads","pinterest"
+        "instagram.com", "instagram", "insta",
+        "facebook.com", "facebook", "fb.com",
+        "meta.com",
+        "reddit.com", "reddit",
+        "tumblr.com", "tumblr",
+        "threads.net", "threads",
+        "pinterest.com", "pinterest",
+        "linkedin.com", "linkedin",
+        "snapchat.com", "snapchat",
+        "tiktok.com", "tiktok",
+        "telegram.org", "telegram",
+        "vk.com", "vk",
     ],
 
+    # ------------------------------------------------------
+    # AI Chatbots & Tools (brand-based)
+    # ------------------------------------------------------
     "AI Chatbots & Tools": [
-        "chatgpt","openai","bard","claude","copilot","perplexity","writesonic","midjourney"
+        "chatgpt.com", "chatgpt",
+        "openai.com", "openai",
+        "gemini.google.com", "bard.google.com", "gemini", "bard",
+        "claude.ai", "claude",
+        "copilot.microsoft.com", "copilot",
+        "perplexity.ai", "perplexity",
+        "writesonic.com", "writesonic",
+        "midjourney.com", "midjourney",
+        "jasper.ai", "jasper",
     ],
 
+    # ------------------------------------------------------
+    # Games (brand/platform-based)
+    # ------------------------------------------------------
     "Games": [
-        "roblox","fortnite","minecraft","epicgames","leagueoflegends",
-        "steam","twitch","itch.io","riotgames","valorant"
+        "roblox.com", "roblox",
+        "minecraft.net", "minecraft",
+        "epicgames.com", "fortnite",
+        "leagueoflegends.com", "leagueoflegends",
+        "playvalorant.com", "valorant",
+        "steampowered.com", "store.steampowered.com", "steam",
+        "riotgames.com", "riotgames",
+        "playstation.com", "playstation",
+        "xbox.com", "xbox",
+        "nintendo.com", "nintendo",
+        "battlenet.com",
+        "ea.com",
+        "gog.com",
+        "itch.io",
+        "ubisoft.com", "ubisoft",
+        "rockstargames.com", "rockstargames",
     ],
 
+    # ------------------------------------------------------
+    # Ecommerce (brand-based)
+    # ------------------------------------------------------
     "Ecommerce": [
-        "amazon","ebay","walmart","bestbuy","aliexpress","etsy",
-        "shopify","mercado libre","target.com","temu"
+        "amazon.com", "amazon",
+        "ebay.com", "ebay",
+        "walmart.com", "walmart",
+        "bestbuy.com", "bestbuy",
+        "aliexpress.com", "aliexpress",
+        "etsy.com", "etsy",
+        "shopify.com", "shopify",
+        "target.com", "target",
+        "costco.com", "costco",
+        "shein.com", "shein",
+        "wayfair.com", "wayfair",
+        "apple.com", "store.apple.com",
+        "store.google.com",
+        "nike.com",
+        "adidas.com",
     ],
 
+    # ------------------------------------------------------
+    # Streaming Services (brand-based)
+    # ------------------------------------------------------
     "Streaming Services": [
-        "netflix","spotify","hulu","vimeo","twitch","soundcloud",
-        "peacocktv","max.com","disneyplus","youtube","youtu.be"
+        "netflix.com", "netflix",
+        "spotify.com", "spotify",
+        "hulu.com", "hulu",
+        "vimeo.com", "vimeo",
+        "twitch.tv", "twitch",
+        "soundcloud.com", "soundcloud",
+        "peacocktv.com", "peacock",
+        "max.com", "hbomax.com",
+        "disneyplus.com", "disneyplus",
+        "youtube.com", "youtu.be", "youtube",
+        "music.apple.com",
+        "paramountplus.com",
+        "deezer.com",
+        "pandora.com",
+        "audible.com",
     ],
 
+    # ------------------------------------------------------
+    # Restricted Content (strong but limited generic words)
+    # ------------------------------------------------------
     "Restricted Content": [
-        "adult","restricted","18plus","age-restricted","nsfw"
+        "nsfw",
+        "age-restricted",
+        "18plus",
     ],
 
+    # ------------------------------------------------------
+    # Gambling (strong but limited words)
+    # ------------------------------------------------------
     "Gambling": [
-        "casino","sportsbook","bet","poker","slot","roulette","draftkings","fanduel"
+        "casino",
+        "sportsbook",
+        "poker",
+        "roulette",
+        "jackpot",
+        "blackjack",
+        "slotmachine",
+        "slots",
     ],
 
+    # ------------------------------------------------------
+    # Illegal, Malicious, or Hacking (technical terms)
+    # ------------------------------------------------------
     "Illegal, Malicious, or Hacking": [
-        "warez","piratebay","crack download","keygen",
-        "free movies streaming","sql injection","ddos","cheat engine"
+        "warez",
+        "keygen",
+        "crackdownload",
+        "crackedsoftware",
+        "sqlinjection",
+        "ddos",
+        "cheatengine",
+        "botnet",
+        "rattool",
     ],
 
+    # ------------------------------------------------------
+    # Drugs & Alcohol (limited strong terms)
+    # ------------------------------------------------------
     "Drugs & Alcohol": [
-        "buy weed","weed","vape","nicotine","delta-8","kratom",
-        "bong","vodka","whiskey","winery","brewery"
+        "marijuana",
+        "cannabis",
+        "vape",
+        "vaping",
+        "nicotine",
+        "bong",
+        "vodka",
+        "whiskey",
+        "tequila",
     ],
 
+    # ------------------------------------------------------
+    # Collaboration (brand-based)
+    # ------------------------------------------------------
     "Collaboration": [
-        "gmail","outlook","office 365","onedrive","teams","slack",
-        "zoom","google docs","google drive","meet.google"
+        "gmail.com", "gmail", "mail.google.com",
+        "outlook.com", "outlook",
+        "office.com", "microsoft365", "office365",
+        "onedrive.live.com", "onedrive",
+        "teams.microsoft.com", "teams",
+        "slack.com", "slack",
+        "zoom.us", "zoom",
+        "docs.google.com",
+        "drive.google.com",
+        "meet.google.com",
+        "dropbox.com", "dropbox",
+        "notion.so", "notion",
     ],
 
+    # ------------------------------------------------------
+    # General / Education (specific edu sites)
+    # ------------------------------------------------------
     "General / Education": [
-        "wikipedia","news","encyclopedia","khan academy","nasa.gov","edu"
+        "wikipedia.org", "wikipedia",
+        "khanacademy.org", "khanacademy",
+        "nasa.gov",
+        "edu",  # from .edu after normalize
+        "edx.org", "edx",
+        "coursera.org", "coursera",
+        "udemy.com", "udemy",
+        "scratch.mit.edu", "scratch",
+        "code.org",
+        "mit.edu",
+        "stanford.edu",
+        "harvard.edu",
     ],
 
+    # ------------------------------------------------------
+    # Sports & Hobbies (brand-based)
+    # ------------------------------------------------------
     "Sports & Hobbies": [
-        "espn","nba","nfl","mlb","nhl","cars","boats","aircraft"
+        "espn.com", "espn",
+        "nba.com", "nba",
+        "nfl.com", "nfl",
+        "mlb.com", "mlb",
+        "nhl.com", "nhl",
+        "fifa.com", "fifa",
     ],
 
+    # ------------------------------------------------------
+    # App Stores & System Updates (brand-based)
+    # ------------------------------------------------------
     "App Stores & System Updates": [
-        "play.google","apps.apple","microsoft store","firmware update","drivers download"
+        "play.google.com",
+        "apps.apple.com",
+        "microsoft.com/store",
+        "store.steampowered.com",
+        "epicgames.com/store",
     ],
 
+    # ------------------------------------------------------
+    # Advertising (specific ad tech)
+    # ------------------------------------------------------
     "Advertising": [
-        "ads.txt","adserver","doubleclick","adchoices","advertising"
+        "ads.txt",
+        "adserver",
+        "doubleclick",
+        "adchoices",
+        "googletagmanager.com",
     ],
 
+    # ------------------------------------------------------
+    # Blogs (platforms only)
+    # ------------------------------------------------------
     "Blogs": [
-        "wordpress","blogger","wattpad","joomla","drupal","medium"
+        "wordpress.com", "wordpress.org", "wordpress",
+        "blogger.com", "blogger",
+        "medium.com", "medium",
+        "wattpad.com", "wattpad",
+        "substack.com", "substack",
     ],
 
+    # ------------------------------------------------------
+    # Health & Medicine (limited & specific)
+    # ------------------------------------------------------
     "Health & Medicine": [
-        "patient portal","glucose","fitbit","apple health","pharmacy","telehealth"
+        "mychart",
+        "patientportal",
+        "telehealth",
+        "webmd.com",
+        "mayoclinic.org",
     ],
 
+    # ------------------------------------------------------
+    # Religion (specific)
+    # ------------------------------------------------------
     "Religion": [
-        "church","synagogue","mosque","bible study","quran","sermon"
+        "biblegateway.com",
+        "quran.com",
+        "biblehub.com",
     ],
 
+    # ------------------------------------------------------
+    # Weapons (few strong terms)
+    # ------------------------------------------------------
     "Weapons": [
-        "knife","guns","rifle","ammo","silencer","tactical"
+        "ammunition",
+        "gunshop",
+        "tacticalgear",
     ],
 
+    # ------------------------------------------------------
+    # Entertainment (brand-based)
+    # ------------------------------------------------------
     "Entertainment": [
-        "tv shows","movies","anime","cartoons","jokes","memes"
+        "imdb.com", "imdb",
+        "rottentomatoes.com",
+        "fandom.com", "fandom",
     ],
 
+    # ------------------------------------------------------
+    # Built-in Apps (names)
+    # ------------------------------------------------------
     "Built-in Apps": [
-        "calculator","camera","clock","files app"
+        "calculator",
+        "camera",
+        "clock",
+        "filesapp",
+        "notesapp",
     ],
 
+    # ------------------------------------------------------
+    # Sexual Content (short + strong)
+    # ------------------------------------------------------
     "Sexual Content": [
-        "xxx","18plus","nsfw","adult"
+        "porn",
+        "pornhub",  # still a strong indicator if seen
+        "xxx",
+        "onlyfans",
+        "nsfw",
     ],
 
+    # ------------------------------------------------------
+    # Allow only (school / allowed)
+    # ------------------------------------------------------
     "Allow only": [
-        "canvas","k12","instructure.com","schoology","googleclassroom"
+        "canvas",
+        "instructure.com",
+        "k12",
+        "schoology",
+        "schoology.com",
+        "googleclassroom",
+        "classroom.google.com",
     ],
 }
-
-# ==========================================================
-# GENERIC "SIMILARITY" WORDS PER CATEGORY
-# ==========================================================
-SIMILARITY_SEEDS = {
-    "Games": {
-        "game", "games", "gaming",
-        "play", "playnow", "playfree", "freeplay",
-        "multiplayer", "onlinegame", "onlinegames",
-        "lobby", "match", "matchmaking", "server"
-    },
-    "Social Media": {
-        "post", "posts", "timeline", "feed",
-        "followers", "following", "like", "likes",
-        "share", "comment", "dm", "directmessage",
-        "story", "stories", "profile", "username"
-    },
-    "Streaming Services": {
-        "watch", "stream", "streaming",
-        "episode", "episodes", "season",
-        "playlist", "nowplaying", "listen",
-        "live", "livechat", "livestream"
-    },
-    "Ecommerce": {
-        "cart", "addtocart", "basket",
-        "checkout", "buynow", "ordernow",
-        "shipping", "delivery", "sale",
-        "discount", "coupon", "customerreviews"
-    },
-    "Gambling": {
-        "casino", "jackpot", "bet", "betting",
-        "odds", "stake", "wager",
-        "spins", "slot", "slots", "roulette",
-        "blackjack", "poker", "baccarat"
-    },
-    "Drugs & Alcohol": {
-        "weed", "marijuana", "cannabis",
-        "vape", "vaping", "nicotine",
-        "beer", "wine", "vodka", "whiskey",
-        "gin", "rum", "tequila", "liquor"
-    },
-    "Illegal, Malicious, or Hacking": {
-        "cracked", "keygen", "pirated",
-        "bypass", "exploit", "cheat", "cheats",
-        "cheatengine", "ddos", "sqlinjection",
-        "hack", "hacking", "warez"
-    },
-    "Sexual Content": {
-        "xxx", "nsfw", "18plus",
-        "adult", "porn", "nude", "nudity"
-    },
-    "Weapons": {
-        "gun", "guns", "rifle", "pistol",
-        "shotgun", "ammo", "ammunition",
-        "scope", "tactical", "holster"
-    },
-    "General / Education": {
-        "lesson", "lessons",
-        "course", "courses",
-        "class", "classes",
-        "tutorial", "tutorials",
-        "homework", "lecture", "lectures",
-        "university", "college", "school"
-    },
-    "Collaboration": {
-        "inbox", "email", "emails",
-        "calendar", "meeting", "meetings",
-        "chat", "channel", "channels",
-        "workspace", "team", "teams"
-    },
-}
-
-# ==========================================================
-# PAD EACH CATEGORY (except Allow only / Always Block) TO 100
-# ==========================================================
-for cat in list(KEYWORDS.keys()):
-    if cat in ("Allow only", "Always Block Social Media"):
-        continue  # leave these as-is
-
-    current = KEYWORDS[cat]
-    need = 100 - len(current)
-    if need > 0:
-        base_slug = re.sub(r"[^a-z0-9]", "_", cat.lower())
-        fillers = [f"{base_slug}_kw_{i}" for i in range(1, need + 1)]
-        KEYWORDS[cat] = current + fillers
 
 # Make sure every category in CATEGORIES has an entry in KEYWORDS
 for cat in CATEGORIES:
@@ -255,8 +389,8 @@ def normalize(text: str):
 
 def _fetch_html(url: str, timeout=3):
     try:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent":"Mozilla/5.0"})
-        if r.ok and "text" in r.headers.get("Content-Type",""):
+        r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
+        if r.ok and "text" in r.headers.get("Content-Type", ""):
             return r.text
     except Exception:
         return ""
@@ -265,22 +399,18 @@ def _fetch_html(url: str, timeout=3):
 def _textify(html: str):
     if not html:
         return ""
-    txt = re.sub(r"<script[\s\S]*?</script>", " ", html, flags=re.I)
-    txt = re.sub(r"<style[\s\S]*?</style>", " ", txt, flags=re.I)
+    txt = re.sub(r"<script[\\s\\S]*?</script>", " ", html, flags=re.I)
+    txt = re.sub(r"<style[\\s\\S]*?</style>", " ", txt, flags=re.I)
     txt = re.sub(r"<[^>]+>", " ", txt)
     txt = unescape(txt)
     return normalize(txt)
-
-def _tokenize(text: str):
-    """Split normalized text into individual tokens."""
-    return re.findall(r"[a-z0-9]+", text.lower())
 
 # ==========================================================
 # CLASSIFIER
 # ==========================================================
 def classify(url: str, html: str = None):
     # Normalize URL
-    if not url.startswith(("http://","https://")):
+    if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
     ext = tldextract.extract(url)
@@ -288,15 +418,25 @@ def classify(url: str, html: str = None):
     host = ".".join([p for p in [ext.subdomain, ext.domain, ext.suffix] if p])
 
     # ------------------------------------------------------
-    # HARD DOMAIN BLOCKS (ROBLOX + optional always-block)
+    # HARD DOMAIN OVERRIDES (ROBLOX + optional always-block)
     # ------------------------------------------------------
     for d in ROBLOX_DOMAINS:
         if host.endswith(d) or domain.endswith(d):
-            return {"category": "Games", "confidence": 1.0, "domain": domain, "host": host}
+            return {
+                "category": "Games",
+                "confidence": 1.0,
+                "domain": domain,
+                "host": host,
+            }
 
     for d in ALWAYS_BLOCK_DOMAINS:
         if host.endswith(d) or domain.endswith(d):
-            return {"category": "Always Block Social Media", "confidence": 1.0, "domain": domain, "host": host}
+            return {
+                "category": "Always Block Social Media",
+                "confidence": 1.0,
+                "domain": domain,
+                "host": host,
+            }
 
     # Build tokens (URL / host / domain / body)
     url_norm = normalize(url)
@@ -308,11 +448,10 @@ def classify(url: str, html: str = None):
         tokens.append(body_norm)
 
     # ======================================================
-    # Score each category (keywords + similarity seeds)
+    # Score each category (specific keywords only)
     # ======================================================
     scores = {c: 0 for c in CATEGORIES}
 
-    # 1) keyword-based scoring with heavier URL/host/domain weight
     for cat, kws in KEYWORDS.items():
         for kw in kws:
             kwn = normalize(kw)
@@ -320,35 +459,34 @@ def classify(url: str, html: str = None):
                 continue
             for i, t in enumerate(tokens):
                 if kwn in t:
+                    # URL / host / domain are strong;
+                    # body is weaker, but still counts.
                     if i <= 2:
-                        # Strong signal: in URL / host / domain
                         scores[cat] += 5
                     else:
-                        # Weak signal: in body text
                         scores[cat] += 1
-
-    # 2) similarity-based scoring (only on body text)
-    body_tokens = set(_tokenize(body_norm)) if body_norm else set()
-
-    for cat, seeds in SIMILARITY_SEEDS.items():
-        matches = 0
-        for seed in seeds:
-            if seed in body_tokens:
-                matches += 1
-        if matches > 0:
-            scores[cat] += matches * 2
 
     # ======================================================
     # Always Block Social Media
     # ======================================================
     if ENABLE_ALWAYS_BLOCK and scores.get("Always Block Social Media", 0) > 0:
-        return {"category": "Always Block Social Media", "confidence": 1.0, "domain": domain, "host": host}
+        return {
+            "category": "Always Block Social Media",
+            "confidence": 1.0,
+            "domain": domain,
+            "host": host,
+        }
 
     # ======================================================
     # Allow only override
     # ======================================================
     if scores.get("Allow only", 0) > 0:
-        return {"category": "Allow only", "confidence": 1.0, "domain": domain, "host": host}
+        return {
+            "category": "Allow only",
+            "confidence": 1.0,
+            "domain": domain,
+            "host": host,
+        }
 
     # ======================================================
     # Pick best category
@@ -360,12 +498,17 @@ def classify(url: str, html: str = None):
     total = sum(scores.values()) or 1
     confidence = scores[best_cat] / total
 
-    return {"category": best_cat, "confidence": float(confidence), "domain": domain, "host": host}
+    return {
+        "category": best_cat,
+        "confidence": float(confidence),
+        "domain": domain,
+        "host": host,
+    }
 
-
+# Quick tests if you run this file directly
 if __name__ == "__main__":
-    # These prints are just for testing in a terminal
     print("Minecraft:", classify("https://www.minecraft.net/en-us"))
     print("Roblox:", classify("https://www.roblox.com"))
-    print("Random game-like text:", classify("https://example.com", html="<title>Play free online games</title>"))
-    print("Random shop:", classify("https://example.com/shop", html="<h1>Add to cart and checkout</h1>"))
+    print("YouTube:", classify("https://www.youtube.com"))
+    print("Khan Academy:", classify("https://www.khanacademy.org"))
+    print("Random news site:", classify("https://www.bbc.com/news"))
