@@ -1,17 +1,6 @@
-
 import re, tldextract, requests
 from html import unescape
 
-# ==========================================================
-# FEATURE TOGGLES
-# ==========================================================
-ENABLE_ALWAYS_BLOCK = True          # Toggle high-risk social media
-ENABLE_ALLOW_ONLY_MODE = False      # Only allow 'Allow only' sites (used outside classify)
-ENABLE_GLOBAL_BLOCK_ALL = False     # Block all non-categorized sites (used outside classify)
-
-# ==========================================================
-# CATEGORY DEFINITIONS
-# ==========================================================
 CATEGORIES = [
     "Advertising",
     "AI Chatbots & Tools",
@@ -40,11 +29,6 @@ CATEGORIES = [
     "Global Block All",
 ]
 
-
-# ==========================================================
-# HIGHLY SPECIFIC KEYWORDS PER CATEGORY
-# (mostly brands / domains, very few generic words)
-# ==========================================================
 KEYWORDS = {
     # ------------------------------------------------------
     # Strong always-block social media (small + specific)
@@ -56,7 +40,7 @@ KEYWORDS = {
         "x.com", "twitter.com", "twitter",
         "bereal.com", "bereal", "be.real",
         "temu.com", "temu",
-    ]
+    ],
 
     # ------------------------------------------------------
     # Social Media (brand-based)
@@ -125,7 +109,7 @@ KEYWORDS = {
     "untappd.com", "untappd",
     "ameblo.jp", "ameblo",
     "livejournal.com", "livejournal"
-]
+],
 
 
     # ------------------------------------------------------
@@ -190,7 +174,7 @@ KEYWORDS = {
     "toonator.ai", "toonator",
     "genmo.ai", "genmo",
     "wondercraft.ai", "wondercraft"
-]
+],
 
 
     # ------------------------------------------------------
@@ -262,7 +246,7 @@ KEYWORDS = {
     "rocketleague.com", "rocketleague",
     "fortnite.com", "fortnite",
     "roblox.com/games", "robloxgames",
-]
+],
 
     # ------------------------------------------------------
     # Ecommerce (brand-based)
@@ -283,8 +267,6 @@ KEYWORDS = {
     "store.google.com",
     "nike.com",
     "adidas.com",
-
-
     "homedepot.com", "homedepot",
     "lowes.com", "lowes",
     "kohls.com", "kohls",
@@ -335,7 +317,7 @@ KEYWORDS = {
     "ubereats.com", "ubereats store",
     "grubhub.com", "grubhub",
     "alibaba.com", "alibaba"
-]
+],
 
 
     # ------------------------------------------------------
@@ -402,7 +384,7 @@ KEYWORDS = {
     "nhl.com/tv", "nhltv",
     "ufc.tv", "ufc",
     "wwe.com/network", "wwenetwork"
-]
+],
 
 
     # ------------------------------------------------------
@@ -520,7 +502,7 @@ KEYWORDS = {
     "pokerstars.com", "pokerstars",
     "partypoker.com", "partypoker",
     "888poker.com", "888poker",
-]
+],
 
 
     # ------------------------------------------------------
@@ -587,7 +569,7 @@ KEYWORDS = {
     "skid",
     "cracker",
     "darkmarket",
-]
+],
 
 
     # ------------------------------------------------------
@@ -656,7 +638,7 @@ KEYWORDS = {
     "oil",
     "shatter",
     "kush",
-]
+],
 
 
     # ------------------------------------------------------
@@ -724,7 +706,7 @@ KEYWORDS = {
     "figjam.com", "figjam",
     "kahoot.com", "kahoot",
     "mentimeter.com", "mentimeter"
-]
+],
 
 
     # ------------------------------------------------------
@@ -793,7 +775,7 @@ KEYWORDS = {
     "khanacademy.org/science", "khanacademy science",
     "mit.edu/research", "mit research",
     "harvard.edu/academics", "harvard academics",
-]
+],
 
 
     # ------------------------------------------------------
@@ -854,7 +836,7 @@ KEYWORDS = {
     "surfline.com", "surfline",
     "skateparkoftampa.com", "skateparkoftampa",
     "ultimatefrisbee.com", "ultimatefrisbee"
-]
+],
 
 
     # ------------------------------------------------------
@@ -866,7 +848,7 @@ KEYWORDS = {
         "microsoft.com/store",
         "store.steampowered.com",
         "epicgames.com/store",
-    ]
+    ],
 
     # ------------------------------------------------------
     # Advertising (specific ad tech)
@@ -925,7 +907,7 @@ KEYWORDS = {
     "adcash.com", "adcash",
     "revcontent.com", "revcontent",
     "epom.com", "epom",
-]
+],
 
 
     # ------------------------------------------------------
@@ -984,7 +966,7 @@ KEYWORDS = {
     "typepad.com", "typepad",
     "journals.sagepub.com", "sage journals",
     "researchgate.net", "researchgate",
-]
+],
 
 
     # ------------------------------------------------------
@@ -995,31 +977,28 @@ KEYWORDS = {
     "webmd.com", "webmd",
     "mayoclinic.org", "mayo clinic", "mayo",
 
-    # Portals (generic terms + real domains)
+
     "mychart", "mychart.com",
     "patientportal", "patient portal",
     "healow", "healow.com",
     "followmyhealth", "follow my health",
     "athenahealth", "athena", "athenahealth.com",
 
-    # Telehealth platforms
     "telehealth", "tele-health",
     "teladoc", "teladoc.com",
     "amwell", "amwell.com",
     "zocdoc", "zocdoc.com",
 
-    # Pharmacy / health brands
     "cvs.com", "cvs health", "cvs",
     "walgreens.com", "walgreens",
     "riteaid.com", "rite aid",
     "goodrx.com", "goodrx",
 
-    # Fitness/health monitoring
     "myfitnesspal.com", "myfitnesspal",
     "fitbit.com", "fitbit",
     "whoop", "whoop.com",
     "garmin health", "garmin.com",
-]
+],
 
 
     # ------------------------------------------------------
@@ -1092,7 +1071,7 @@ KEYWORDS = {
     "biblia.com",
     "logos.com",
     "accordancebible.com"
-]
+],
 
 
     # ------------------------------------------------------
@@ -1102,7 +1081,7 @@ KEYWORDS = {
         "ammunition",
         "gunshop",
         "tacticalgear",
-    ]
+    ],
 
     # ------------------------------------------------------
     # Entertainment (brand-based)
@@ -1162,7 +1141,7 @@ KEYWORDS = {
     "comicvine.gamespot.com", "comicvine",
     "myanimelist.net", "myanimelist",
     "animenewsnetwork.com", "animenewsnetwork"
-]
+],
 
 
     # ------------------------------------------------------
@@ -1242,7 +1221,7 @@ KEYWORDS = {
     "https://canvas.apps.chrome",
     "canvas.apps.chrome",
     "canvas.google.com",
-]
+],
 
 
 
@@ -1255,7 +1234,7 @@ KEYWORDS = {
         "xxx",
         "onlyfans",
         "nsfw",
-    ]
+    ],
 
     # ------------------------------------------------------
     # Allow only (school / allowed)
@@ -1267,135 +1246,62 @@ KEYWORDS = {
         "googleclassroom",
         "classroom.google.com",
     ]
+
 }
-
-# Make sure every category in CATEGORIES has an entry in KEYWORDS
-for cat in CATEGORIES:
-    if cat not in KEYWORDS:
-        KEYWORDS[cat] = []
-
-# ==========================================================
-# NORMALIZE & CLEAN HTML
-# ==========================================================
-def normalize(text: str):
-    text = text.lower()
-    return re.sub(r"[^a-z0-9]", "", text)
 
 def _fetch_html(url: str, timeout=3):
     try:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
-        if r.ok and "text" in r.headers.get("Content-Type", ""):
+        r = requests.get(url, timeout=timeout, headers={"User-Agent":"Mozilla/5.0"})
+        if r.ok and "text" in r.headers.get("Content-Type",""):
             return r.text
     except Exception:
         return ""
     return ""
 
 def _textify(html: str):
-    if not html:
-        return ""
-    txt = re.sub(r"<script[\\s\\S]*?</script>", " ", html, flags=re.I)
-    txt = re.sub(r"<style[\\s\\S]*?</style>", " ", txt, flags=re.I)
+    if not html: return ""
+    txt = re.sub(r"<script[\s\S]*?</script>", " ", html, flags=re.I)
+    txt = re.sub(r"<style[\s\S]*?</style>", " ", txt, flags=re.I)
     txt = re.sub(r"<[^>]+>", " ", txt)
     txt = unescape(txt)
-    return normalize(txt)
+    txt = re.sub(r"\s+", " ", txt).strip().lower()
+    return txt
 
-# ==========================================================
-# CLASSIFIER
-# ==========================================================
 def classify(url: str, html: str = None):
-    # Normalize URL
-    if not url.startswith(("http://", "https://")):
-        url = "https://" + url
-
+    """
+    Returns dict: {category: str, confidence: float}
+    """
+    if not (url or "").startswith(("http://","https://")):
+        url = "https://" + (url or "")
     ext = tldextract.extract(url)
     domain = ".".join([p for p in [ext.domain, ext.suffix] if p])
-    host = ".".join([p for p in [ext.subdomain, ext.domain, ext.suffix] if p])
+    host = ".".join([p for p in [ext.subdomain, ext.domain, ext.suffix] if p if p])
 
-    # ------------------------------------------------------
-    # HARD DOMAIN OVERRIDES (ROBLOX + optional always-block)
-    # ------------------------------------------------------
-    for d in ROBLOX_DOMAINS:
-        if host.endswith(d) or domain.endswith(d):
-            return {
-                "category": "Games",
-                "confidence": 1.0,
-                "domain": domain,
-                "host": host,
-            }
+    tokens = [url.lower(), host.lower(), domain.lower()]
+    body = _textify(html) if html else _textify(_fetch_html(url))
+    if body:
+        tokens.append(body)
 
-    for d in ALWAYS_BLOCK_DOMAINS:
-        if host.endswith(d) or domain.endswith(d):
-            return {
-                "category": "Always Block Social Media",
-                "confidence": 1.0,
-                "domain": domain,
-                "host": host,
-            }
-
-    # Build tokens (URL / host / domain / body)
-    url_norm = normalize(url)
-    host_norm = normalize(host)
-    domain_norm = normalize(domain)
-    tokens = [url_norm, host_norm, domain_norm]
-    body_norm = _textify(html) if html else _textify(_fetch_html(url))
-    if body_norm:
-        tokens.append(body_norm)
-
-    # ======================================================
-    # Score each category (specific keywords only)
-    # ======================================================
     scores = {c: 0 for c in CATEGORIES}
-
     for cat, kws in KEYWORDS.items():
         for kw in kws:
-            kwn = normalize(kw)
-            if not kwn:
-                continue
-            for i, t in enumerate(tokens):
-                if kwn in t:
-                    # URL / host / domain are strong;
-                    # body is weaker, but still counts.
-                    if i <= 2:
-                        scores[cat] += 5
-                    else:
-                        scores[cat] += 1
+            pat = kw.lower()
+            for t in tokens:
+                if pat in t:
+                    scores[cat] += 1
 
-    # ======================================================
-    # Always Block Social Media
-    # ======================================================
-    if ENABLE_ALWAYS_BLOCK and scores.get("Always Block Social Media", 0) > 0:
-        return {
-            "category": "Always Block Social Media",
-            "confidence": 1.0,
-            "domain": domain,
-            "host": host,
-        }
+    # Special-case rules
+    if any(s in domain for s in ["edu",".edu"]): scores["General / Education"] += 3
+    if any(s in url for s in ["wp-login","/wp-content/"]): scores["Blogs"] += 1
 
-    # ======================================================
-    # Allow only override
-    # ======================================================
-    if scores.get("Allow only", 0) > 0:
-        return {
-            "category": "Allow only",
-            "confidence": 1.0,
-            "domain": domain,
-            "host": host,
-        }
-
-    # ======================================================
-    # Pick best category
-    # ======================================================
-    best_cat = max(scores, key=lambda x: scores[x])
-    if scores[best_cat] == 0:
-        best_cat = "Uncategorized"
+    # ✅ Prioritize Allow only
+    if scores["Allow only"] > 0:
+        best_cat = "Allow only"
+    else:
+        best_cat = max(scores, key=lambda c: scores[c])
+        if scores[best_cat] == 0:
+            best_cat = "Uncategorized"
 
     total = sum(scores.values()) or 1
-    confidence = scores[best_cat] / total
-
-    return {
-        "category": best_cat,
-        "confidence": float(confidence),
-        "domain": domain,
-        "host": host,
-    }
-
+    conf = scores[best_cat] / total
+    return {"category": best_cat, "confidence": float(conf), "domain": domain, "host": host}
