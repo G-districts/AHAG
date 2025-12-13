@@ -463,7 +463,7 @@ KEYWORDS = {
     "canvas.apps.chrome",
     "canvas.google.com"],
     # ✅ Fixed keywords for Allow only (normalized)
-    "Allow only": ["canvas", "k12", "instructure.com"],
+    "Allow only": ["canvas", "k12", "instructure.com","accounts.google.com","myaccount",accounts.google"],
 
 }
 
