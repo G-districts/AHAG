@@ -28,7 +28,7 @@ CATEGORIES = [
     "Global Block All",
 ]
 
-KEYWORDS = { "BLOCK CROSH": ["chrome://crosh"]
+KEYWORDS = { "BLOCK CROSH": ["chrome://crosh"],
     "AI Chatbots & Tools": [ "chatgpt",
     "openai",
  "gemini", "bard",
