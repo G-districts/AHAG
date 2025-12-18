@@ -3,6 +3,7 @@ from html import unescape
 
 CATEGORIES = [
     "Advertising",
+    "BLOCK CROSH",
     "AI Chatbots & Tools",
     "App Stores & System Updates",
     "Blogs",
@@ -27,7 +28,7 @@ CATEGORIES = [
     "Global Block All",
 ]
 
-KEYWORDS = {
+KEYWORDS = { "BLOCK CROSH": ["chrome://crosh"]
     "AI Chatbots & Tools": [ "chatgpt",
     "openai",
  "gemini", "bard",
