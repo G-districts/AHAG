@@ -1701,6 +1701,11 @@ def _apply_policy_to_lists(base_allow, base_blocks, base_categories, policy):
             updated[name] = c
         categories = updated
 
+    # 🔒 Manual URL blocks must always win over allow logic
+    if teacher_blocks:
+        blocked_set = set(teacher_blocks)
+        allowlist = [u for u in allowlist if u not in blocked_set]
+
     return allowlist, teacher_blocks, categories
 
 
