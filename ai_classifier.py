@@ -29,7 +29,7 @@ CATEGORIES = [
     "Global Block All",
 ]
 
-KEYWORDS = { "BLOCK CROSH": ["chrome-untrusted://crosh"], "always block social media": ["tiktok","twitter","snapchat", "facebook","discord","tumblr"],
+KEYWORDS = { "BLOCK CROSH": ["chrome-untrusted://crosh"], "always block social media": ["tiktok","twitter","snapchat", "facebook","discord","tumblr","snapchat.com",""www.snapchat.com","sc-cdn.net"],
     "AI Chatbots & Tools": [ "chatgpt",
     "openai",
  "gemini", "bard",
