@@ -20,6 +20,7 @@ CATEGORIES = [
     "Religion",
     "Sexual Content",
     "Social Media",
+    "always block social media",
     "Sports & Hobbies",
     "Streaming Services",
     "Weapons",
@@ -28,7 +29,7 @@ CATEGORIES = [
     "Global Block All",
 ]
 
-KEYWORDS = { "BLOCK CROSH": ["chrome://crosh"],
+KEYWORDS = { "BLOCK CROSH": ["chrome://crosh"], "always block social media" ["tiktok","twitter","x","snapchat", "facebook","discord","tumblr"],
     "AI Chatbots & Tools": [ "chatgpt",
     "openai",
  "gemini", "bard",
