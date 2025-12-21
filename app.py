@@ -6,8 +6,7 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
 from urllib.parse import urlparse
-import random
-import hashlib
+import random, time, hashlib
 from datetime import datetime
 from collections import defaultdict
 from image_filter_ai import classify_image as _gschool_classify_image
@@ -52,6 +51,11 @@ SCENES_PATH = os.path.join(ROOT, "scenes.json")
 # =========================
 # Helpers: Data & Database
 # =========================
+def _clean_expired_bypass_codes(settings):
+    now = time.time()
+    settings["bypass_codes"] = [
+        c for c in settings.get("bypass_codes", []) if c["expires"] > now
+    ]
 
 def _hash_code(code: str) -> str:
     return hashlib.sha256(code.encode()).hexdigest()
@@ -490,12 +494,22 @@ def generate_bypass_code():
     settings = d.setdefault("settings", {})
     settings.setdefault("bypass_codes", [])
 
-    ttl_minutes = int((request.json or {}).get("ttl_minutes", 10))
+    # Use TTL from request OR fallback to global setting OR default 10
+    ttl_minutes = int(
+        (request.json or {}).get(
+            "ttl_minutes",
+            settings.get("bypass_ttl_minutes", 10)
+        )
+    )
+
+    # Clamp TTL to 1–1440
+    ttl_minutes = max(1, min(1440, ttl_minutes))
+
     code = f"{random.randint(0, 999999):06d}"
     expires = time.time() + (ttl_minutes * 60)
 
     settings["bypass_codes"].append({
-        "hash": _hash_code(code),
+        "hash": hashlib.sha256(code.encode()).hexdigest(),
         "expires": expires
     })
 
@@ -505,9 +519,9 @@ def generate_bypass_code():
     return jsonify({
         "ok": True,
         "code": code,
-        "expires_at": expires
+        "expires_at": expires,
+        "ttl_minutes": ttl_minutes
     })
-
 
 @app.route("/admin")
 def admin_page():
