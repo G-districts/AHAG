@@ -8,6 +8,7 @@ from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
 from urllib.parse import urlparse
 from datetime import datetime
+import secrets
 from collections import defaultdict
 from image_filter_ai import classify_image as _gschool_classify_image
 
