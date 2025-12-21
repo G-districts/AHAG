@@ -489,6 +489,19 @@ def index():
 def login_page():
     return render_template("login.html")
 
+@app.route("/api/admin/save-settings", methods=["POST"])
+def save_settings():
+    d = ensure_keys(load_data())
+    b = request.json or {}
+
+    # Update bypass_enabled flag
+    bypass_enabled = bool(b.get("bypass_enabled", False))
+    d.setdefault("settings", {})["bypass_enabled"] = bypass_enabled
+
+    save_data(d)
+
+    return jsonify({"ok": True, "bypass_enabled": bypass_enabled})
+
 @app.route("/admin")
 def admin_page():
     u = current_user()
