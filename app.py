@@ -488,6 +488,43 @@ def index():
 def login_page():
     return render_template("login.html")
 
+@app.route("/api/bypass/list", methods=["GET"])
+def list_bypass_codes():
+    d = ensure_keys(load_data())
+    settings = d.get("settings", {})
+    codes = settings.get("bypass_codes", [])
+
+    now = time.time()
+    active = []
+
+    for c in codes:
+        if c.get("expires", 0) > now:
+            active.append({
+                "hash_preview": c["hash"][:8],  # safe display
+                "expires_at": c["expires"],
+                "seconds_left": int(c["expires"] - now)
+            })
+
+    return jsonify({"ok": True, "codes": active})
+
+
+@app.route("/api/bypass/revoke", methods=["POST"])
+def revoke_bypass_code():
+    d = ensure_keys(load_data())
+    settings = d.get("settings", {})
+    codes = settings.get("bypass_codes", [])
+
+    h = (request.json or {}).get("hash_preview")
+    if not h:
+        return jsonify({"ok": False}), 400
+
+    settings["bypass_codes"] = [
+        c for c in codes if not c["hash"].startswith(h)
+    ]
+
+    save_data(d)
+    return jsonify({"ok": True})
+
 @app.route("/api/bypass/generate", methods=["POST"])
 def generate_bypass_code():
     d = ensure_keys(load_data())
