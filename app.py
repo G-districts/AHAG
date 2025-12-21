@@ -1003,13 +1003,13 @@ def api_data():
             }
         }
     })
-@app.route("/api/settings", methods=["POST"])
+@app.route("/api/settings", methods=["GET", "POST"])
 def api_settings():
     u = current_user()
     if not u or u["role"] != "admin":
         return jsonify({"ok": False, "error": "forbidden"}), 403
-    d = ensure_keys(load_data())
 
+    d = ensure_keys(load_data())
 
     # ✅ NEW: allow admin to READ settings
     if request.method == "GET":
@@ -1017,6 +1017,10 @@ def api_settings():
             "ok": True,
             "settings": d.get("settings", {})
         })
+
+    # ===============================
+    # EXISTING LOGIC (UNCHANGED)
+    # ===============================
     b = request.json or {}
 
     # existing settings
