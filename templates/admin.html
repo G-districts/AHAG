@@ -74,12 +74,10 @@
 <article class="card">
   <h3>Bypass Overrides</h3>
 
-  <label>
-    <input id="bypassEnabled" type="checkbox">
-    Enable Bypass Override on Block Pages
-  </label>
-
-  <hr>
+<label>
+  <input id="bypassEnabled" type="checkbox">
+  Enable Bypass Override on Block Pages
+</label>
 
   <h4>Create Temporary Bypass</h4>
 
@@ -941,11 +939,22 @@ const tableBody = document.querySelector("#bypassTable tbody");
 const msg = document.getElementById("createMsg");
 
 async function loadSettings() {
-  const res = await api("/api/settings"); // GET current settings
-  if (res && typeof res.bypass_enabled !== "undefined") {
-    bypassEnabled.checked = res.bypass_enabled;
+  try {
+    const r = await fetch("/api/settings"); // REAL GET
+    if (!r.ok) return;
+
+    const res = await r.json();
+
+    if (res.settings && typeof res.settings.bypass_enabled !== "undefined") {
+      bypassEnabled.checked = !!res.settings.bypass_enabled;
+    }
+  } catch (e) {
+    console.error("Failed to load settings", e);
   }
 }
+
+window.addEventListener("DOMContentLoaded", loadSettings);
+
 
 loadSettings();
 
