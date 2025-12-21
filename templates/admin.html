@@ -96,6 +96,24 @@
   <button id="save">Save</button>
   <small id="msg" style="margin-left:8px"></small>
 </article>
+ 
+<h4>Active Bypass Codes</h4>
+
+<table>
+  <thead>
+    <tr>
+      <th>Code ID</th>
+      <th>Expires</th>
+      <th>Time Left</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="bypassList"></tbody>
+</table>
+
+<small class="mini">
+  Codes are hidden for security. You can revoke them early if needed.
+</small>
 
 <h3>Policies</h3>
 <article>
@@ -329,6 +347,48 @@
 
 <script>
   // ============ Settings ============
+
+async function loadBypassList() {
+  const tbody = document.getElementById('bypassList');
+  if (!tbody) return;
+
+  const r = await fetch('/api/bypass/list');
+  const j = await r.json();
+  if (!j.ok) return;
+
+  tbody.innerHTML = '';
+
+  j.codes.forEach(c => {
+    const tr = document.createElement('tr');
+
+    const tdId = document.createElement('td');
+    tdId.textContent = c.hash_preview;
+
+    const tdExp = document.createElement('td');
+    tdExp.textContent = new Date(c.expires_at * 1000).toLocaleTimeString();
+
+    const tdLeft = document.createElement('td');
+    tdLeft.textContent = Math.ceil(c.seconds_left / 60) + ' min';
+
+    const tdBtn = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.textContent = 'Revoke';
+    btn.className = 'secondary';
+    btn.onclick = async () => {
+      await fetch('/api/bypass/revoke', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ hash_preview: c.hash_preview })
+      });
+      loadBypassList();
+      setInterval(loadBypassList, 30000);
+    };
+
+    tdBtn.appendChild(btn);
+    tr.append(tdId, tdExp, tdLeft, tdBtn);
+    tbody.appendChild(tr);
+  });
+}
 
 async function saveSettingsWithPasscode(passcodeValue) {
   const body = {
