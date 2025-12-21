@@ -54,6 +54,21 @@ SCENES_PATH = os.path.join(ROOT, "scenes.json")
 # =========================
 # Helpers: Data & Database
 # =========================
+def now_ts():
+    """Return current UTC timestamp as int."""
+    return int(datetime.now(tz=timezone.utc).timestamp())
+
+def cleanup_expired_bypasses(data):
+    """Remove any bypass codes that have expired."""
+    bypasses = data.get("bypass_codes", {})
+    removed = []
+    for code, info in list(bypasses.items()):
+        if info.get("expires_at", 0) <= now_ts():
+            del bypasses[code]
+            removed.append(code)
+    if removed:
+        save_data(data)
+    return removed
 
 def db():
     """Open sqlite connection (row factory stays default to keep light)."""
@@ -1960,7 +1975,7 @@ def api_policy():
 @app.route("/api/bypass", methods=["POST"])
 def api_bypass():
     d = ensure_keys(load_data())
-    cleanup_expired_bypasses(d)
+    cleanup_expired_bypasses(d)  # always clean expired codes first
 
     b = request.json or {}
     code = (b.get("code") or "").strip()
@@ -1977,33 +1992,31 @@ def api_bypass():
     if not info:
         return jsonify({"ok": False, "allow": False, "error": "invalid_or_expired"}), 403
 
-    # Check expiration
-    now_ts = int(datetime.now(tz=timezone.utc).timestamp())
-    if info["expires_at"] <= now_ts:
-        del bypasses[code]
+    # Check if the code is still active
+    current_ts = now_ts()
+    if current_ts > info["expires_at"]:
+        del bypasses[code]  # remove expired
         save_data(d)
         return jsonify({"ok": False, "allow": False, "error": "expired"}), 403
 
-    # Optional URL check
+    # Optional: check URL restrictions
     if info.get("urls") and not any(url.startswith(u) for u in info["urls"]):
         return jsonify({"ok": False, "allow": False, "error": "url_not_allowed"}), 403
 
-    # TTL: always give the full duration of the code, not remaining time
-    ttl_minutes = info.get("ttl_minutes", 10)  # fallback default if missing
-
+    # Log usage (per-user, does not expire the code)
     log_action({
         "event": "bypass_used",
         "user": user,
         "url": url,
-        "code": code
+        "code": code,
+        "expires_in": info["expires_at"] - current_ts
     })
 
     return jsonify({
         "ok": True,
         "allow": True,
-        "ttl_minutes": ttl_minutes
+        "expires_in": info["expires_at"] - current_ts  # return remaining seconds
     })
-
 # =========================
 # Timeline & Screenshots
 # =========================
