@@ -51,6 +51,17 @@ SCENES_PATH = os.path.join(ROOT, "scenes.json")
 # Helpers: Data & Database
 # =========================
 
+def _hash_code(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+def _clean_expired_bypass_codes(settings: dict):
+    now = time.time()
+    codes = settings.get("bypass_codes", [])
+    settings["bypass_codes"] = [
+        c for c in codes
+        if c.get("expires", 0) > now
+    ]
+
 def db():
     """Open sqlite connection (row factory stays default to keep light)."""
     con = sqlite3.connect(DB_PATH)
@@ -470,6 +481,31 @@ def index():
 @app.route("/login")
 def login_page():
     return render_template("login.html")
+
+@app.route("/api/bypass/generate", methods=["POST"])
+def generate_bypass_code():
+    d = ensure_keys(load_data())
+    settings = d.setdefault("settings", {})
+    settings.setdefault("bypass_codes", [])
+
+    ttl_minutes = int((request.json or {}).get("ttl_minutes", 10))
+    code = f"{random.randint(0, 999999):06d}"
+    expires = time.time() + (ttl_minutes * 60)
+
+    settings["bypass_codes"].append({
+        "hash": _hash_code(code),
+        "expires": expires
+    })
+
+    _clean_expired_bypass_codes(settings)
+    save_data(d)
+
+    return jsonify({
+        "ok": True,
+        "code": code,
+        "expires_at": expires
+    })
+
 
 @app.route("/admin")
 def admin_page():
@@ -1889,14 +1925,20 @@ def api_policy():
         "bypass_ttl_minutes": int(d.get("settings", {}).get("bypass_ttl_minutes", 10)),
     }
     return jsonify(resp)
+
+
+# =========================
+# Timeline & Screenshots
+# =========================
 @app.route("/api/bypass", methods=["POST"])
 def api_bypass():
     """
     Called by the block page / extension when a user enters the bypass code.
-    Checks the code against admin settings and returns allow/deny.
+    Supports MULTIPLE active bypass codes with TTL.
     """
     d = ensure_keys(load_data())
     b = request.json or {}
+
     code = (b.get("code") or "").strip()
     url = (b.get("url") or "").strip()
     user = (b.get("user") or "").strip()
@@ -1905,19 +1947,27 @@ def api_bypass():
     if not settings.get("bypass_enabled"):
         return jsonify({"ok": False, "allow": False, "error": "disabled"}), 403
 
-    expected = (settings.get("bypass_code") or "").strip()
-    if not expected or expected != code:
+    # Remove expired codes first
+    _clean_expired_bypass_codes(settings)
+
+    hashed = _hash_code(code)
+    valid = any(
+        c.get("hash") == hashed
+        for c in settings.get("bypass_codes", [])
+    )
+
+    if not valid:
+        save_data(d)  # persist cleanup
         return jsonify({"ok": False, "allow": False, "error": "invalid"}), 403
 
-    # Optional: log bypass usage
-    log_action({"event": "bypass_used", "user": user, "url": url})
+    log_action({
+        "event": "bypass_used",
+        "user": user,
+        "url": url
+    })
 
+    save_data(d)
     return jsonify({"ok": True, "allow": True})
-
-
-# =========================
-# Timeline & Screenshots
-# =========================
 
 # =========================
 # Policy Management APIs
