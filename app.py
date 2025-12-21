@@ -5,6 +5,9 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
+import time
+import secrets
+import string
 from urllib.parse import urlparse
 from datetime import datetime
 from collections import defaultdict
@@ -281,7 +284,22 @@ def log_action(entry):
     except Exception:
         pass
 
+def now():
+    return int(time.time())
 
+def generate_bypass_code(length=6):
+    alphabet = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+def cleanup_expired_bypasses(d):
+    bypasses = d.get("bypass_codes", {})
+    t = now()
+
+    expired = [code for code, info in bypasses.items() if info["expires_at"] <= t]
+    for code in expired:
+        del bypasses[code]
+
+    d["bypass_codes"] = bypasses
 # =========================
 # Guest handling helper
 # =========================
@@ -477,6 +495,39 @@ def admin_page():
     if not u or u["role"] != "admin":
         return redirect(url_for("login_page"))
     return render_template("admin.html", data=load_data(), user=u)
+
+@app.route("/api/admin/create-bypass", methods=["POST"])
+def create_bypass():
+    d = ensure_keys(load_data())
+    cleanup_expired_bypasses(d)
+
+    b = request.json or {}
+    user = (b.get("user") or "").strip()
+    urls = b.get("urls") or []
+    ttl = int(b.get("ttl_minutes", 10))
+
+    if ttl < 1:
+        ttl = 1
+    if ttl > 1440:
+        ttl = 1440
+
+    code = generate_bypass_code()
+    expires_at = now() + ttl * 60
+
+    d.setdefault("bypass_codes", {})[code] = {
+        "expires_at": expires_at,
+        "user": user,
+        "urls": urls
+    }
+
+    save_data(d)
+
+    return jsonify({
+        "ok": True,
+        "code": code,
+        "expires_in_minutes": ttl
+    })
+
 
 @app.route("/teacher")
 def teacher_page():
@@ -1891,11 +1942,9 @@ def api_policy():
     return jsonify(resp)
 @app.route("/api/bypass", methods=["POST"])
 def api_bypass():
-    """
-    Called by the block page / extension when a user enters the bypass code.
-    Checks the code against admin settings and returns allow/deny.
-    """
     d = ensure_keys(load_data())
+    cleanup_expired_bypasses(d)
+
     b = request.json or {}
     code = (b.get("code") or "").strip()
     url = (b.get("url") or "").strip()
@@ -1905,12 +1954,27 @@ def api_bypass():
     if not settings.get("bypass_enabled"):
         return jsonify({"ok": False, "allow": False, "error": "disabled"}), 403
 
-    expected = (settings.get("bypass_code") or "").strip()
-    if not expected or expected != code:
-        return jsonify({"ok": False, "allow": False, "error": "invalid"}), 403
+    bypasses = d.get("bypass_codes", {})
+    info = bypasses.get(code)
 
-    # Optional: log bypass usage
-    log_action({"event": "bypass_used", "user": user, "url": url})
+    if not info:
+        return jsonify({"ok": False, "allow": False, "error": "invalid_or_expired"}), 403
+
+    if info["expires_at"] <= now():
+        del bypasses[code]
+        save_data(d)
+        return jsonify({"ok": False, "allow": False, "error": "expired"}), 403
+
+    # URL check (optional but recommended)
+    if info["urls"] and not any(url.startswith(u) for u in info["urls"]):
+        return jsonify({"ok": False, "allow": False, "error": "url_not_allowed"}), 403
+
+    log_action({
+        "event": "bypass_used",
+        "user": user,
+        "url": url,
+        "code": code
+    })
 
     return jsonify({"ok": True, "allow": True})
 
