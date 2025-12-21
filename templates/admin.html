@@ -940,6 +940,15 @@ const createBtn = document.getElementById("createBypass");
 const tableBody = document.querySelector("#bypassTable tbody");
 const msg = document.getElementById("createMsg");
 
+async function loadSettings() {
+  const res = await api("/api/settings"); // GET current settings
+  if (res && typeof res.bypass_enabled !== "undefined") {
+    bypassEnabled.checked = res.bypass_enabled;
+  }
+}
+
+loadSettings();
+
 /* Save bypass enabled toggle */
 bypassEnabled.addEventListener("change", async () => {
   await api("/api/settings", {
