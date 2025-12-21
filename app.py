@@ -494,22 +494,25 @@ def generate_bypass_code():
     settings = d.setdefault("settings", {})
     settings.setdefault("bypass_codes", [])
 
-    # Use TTL from request OR fallback to global setting OR default 10
-    ttl_minutes = int(
-        (request.json or {}).get(
-            "ttl_minutes",
-            settings.get("bypass_ttl_minutes", 10)
-        )
-    )
+    # Use TTL sent in request (must be an int)
+    try:
+        ttl_minutes = int((request.json or {}).get("ttl_minutes", 10))
+    except Exception:
+        ttl_minutes = 10
 
-    # Clamp TTL to 1–1440
+    # Clamp TTL
     ttl_minutes = max(1, min(1440, ttl_minutes))
 
+    # Save TTL to settings so frontend can read it
+    settings["bypass_ttl_minutes"] = ttl_minutes
+    save_data(d)
+
+    # Generate 6-digit code
     code = f"{random.randint(0, 999999):06d}"
     expires = time.time() + (ttl_minutes * 60)
 
     settings["bypass_codes"].append({
-        "hash": hashlib.sha256(code.encode()).hexdigest(),
+        "hash": _hash_code(code),
         "expires": expires
     })
 
