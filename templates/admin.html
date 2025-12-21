@@ -943,9 +943,7 @@
     loadImageFilterConfig();
     startImageFilterPolling();
   })();
-</script>
-<script>
-async function api(url, body) {
+  async function api(url, body) {
   const r = await fetch(url, {
     method: "POST",
     headers: {"Content-Type":"application/json"},
