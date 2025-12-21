@@ -985,6 +985,27 @@ def api_data():
             }
         }
     })
+
+@app.route("/api/bypass/active", methods=["GET"])
+def get_active_bypass_codes():
+    d = ensure_keys(load_data())
+    settings = d.get("settings", {})
+
+    _clean_expired_bypass_codes(settings)
+    save_data(d)
+
+    now = time.time()
+    return jsonify({
+        "ok": True,
+        "codes": [
+            {
+                "expires": c["expires"],
+                "ttl": int(c["expires"] - now)
+            }
+            for c in settings.get("bypass_codes", [])
+        ]
+    })
+    
 @app.route("/api/settings", methods=["POST"])
 def api_settings():
     u = current_user()
