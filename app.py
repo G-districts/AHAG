@@ -1955,6 +1955,7 @@ def api_policy():
         "bypass_ttl_minutes": int(d.get("settings", {}).get("bypass_ttl_minutes", 10)),
     }
     return jsonify(resp)
+
 @app.route("/api/bypass", methods=["POST"])
 def api_bypass():
     d = ensure_keys(load_data())
@@ -1975,14 +1976,19 @@ def api_bypass():
     if not info:
         return jsonify({"ok": False, "allow": False, "error": "invalid_or_expired"}), 403
 
-    if info["expires_at"] <= now():
+    # Check expiration
+    now_ts = int(datetime.now(tz=timezone.utc).timestamp())
+    if info["expires_at"] <= now_ts:
         del bypasses[code]
         save_data(d)
         return jsonify({"ok": False, "allow": False, "error": "expired"}), 403
 
-    # URL check (optional but recommended)
-    if info["urls"] and not any(url.startswith(u) for u in info["urls"]):
+    # Optional URL check
+    if info.get("urls") and not any(url.startswith(u) for u in info["urls"]):
         return jsonify({"ok": False, "allow": False, "error": "url_not_allowed"}), 403
+
+    # TTL: always give the full duration of the code, not remaining time
+    ttl_minutes = info.get("ttl_minutes", 10)  # fallback default if missing
 
     log_action({
         "event": "bypass_used",
@@ -1991,8 +1997,11 @@ def api_bypass():
         "code": code
     })
 
-    return jsonify({"ok": True, "allow": True})
-
+    return jsonify({
+        "ok": True,
+        "allow": True,
+        "ttl_minutes": ttl_minutes
+    })
 
 # =========================
 # Timeline & Screenshots
