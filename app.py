@@ -1000,44 +1000,12 @@ def api_data():
             }
         }
     })
-
-@app.route("/api/admin/list-bypasses", methods=["GET"])
-def list_bypasses():
-    d = ensure_keys(load_data())
-    cleanup_expired_bypasses(d)
-
-    t = now()
-    out = []
-
-    for code, info in d.get("bypass_codes", {}).items():
-        expires_in = max(0, int((info["expires_at"] - t) / 60))
-        out.append({
-            "code": code,
-            "user": info.get("user", ""),
-            "urls": info.get("urls", []),
-            "expires_in": expires_in
-        })
-
-    return jsonify({"bypasses": out})
-
-@app.route("/api/settings", methods=["GET", "POST"])
+@app.route("/api/settings", methods=["POST"])
 def api_settings():
     u = current_user()
     if not u or u["role"] != "admin":
         return jsonify({"ok": False, "error": "forbidden"}), 403
-
     d = ensure_keys(load_data())
-
-    # ✅ NEW: allow admin to READ settings
-    if request.method == "GET":
-        return jsonify({
-            "ok": True,
-            "settings": d.get("settings", {})
-        })
-
-    # ===============================
-    # EXISTING LOGIC (UNCHANGED)
-    # ===============================
     b = request.json or {}
 
     # existing settings
@@ -1068,7 +1036,6 @@ def api_settings():
 
     save_data(d)
     return jsonify({"ok": True, "settings": d["settings"]})
-
 
 @app.route("/api/categories", methods=["POST"])
 def api_categories():
