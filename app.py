@@ -1975,7 +1975,9 @@ def api_policy():
 @app.route("/api/bypass", methods=["POST"])
 def api_bypass():
     d = ensure_keys(load_data())
-    cleanup_expired_bypasses(d)  # always clean expired codes first
+
+    # Clean expired codes first
+    cleanup_expired_bypasses(d)
 
     b = request.json or {}
     code = (b.get("code") or "").strip()
@@ -1983,7 +1985,7 @@ def api_bypass():
     user = (b.get("user") or "").strip()
 
     settings = d.get("settings", {})
-    if not settings.get("bypass_enabled"):
+    if not settings.get("bypass_enabled", True):
         return jsonify({"ok": False, "allow": False, "error": "disabled"}), 403
 
     bypasses = d.get("bypass_codes", {})
@@ -1992,18 +1994,25 @@ def api_bypass():
     if not info:
         return jsonify({"ok": False, "allow": False, "error": "invalid_or_expired"}), 403
 
-    # Check if the code is still active
     current_ts = now_ts()
+
+    # Remove expired codes
     if current_ts > info["expires_at"]:
-        del bypasses[code]  # remove expired
+        del bypasses[code]
         save_data(d)
         return jsonify({"ok": False, "allow": False, "error": "expired"}), 403
 
-    # Optional: check URL restrictions
-    if info.get("urls") and not any(url.startswith(u) for u in info["urls"]):
-        return jsonify({"ok": False, "allow": False, "error": "url_not_allowed"}), 403
+    # Optional URL restriction
+    if info.get("urls") and url:
+        if not any(url.startswith(u) for u in info["urls"]):
+            return jsonify({"ok": False, "allow": False, "error": "url_not_allowed"}), 403
 
-    # Log usage (per-user, does not expire the code)
+    # Extend the bypass TTL if you want it to remain valid for the configured time
+    ttl_minutes = settings.get("bypass_ttl_minutes", 10)
+    info["expires_at"] = current_ts + ttl_minutes * 60
+    save_data(d)
+
+    # Log usage
     log_action({
         "event": "bypass_used",
         "user": user,
@@ -2015,8 +2024,9 @@ def api_bypass():
     return jsonify({
         "ok": True,
         "allow": True,
-        "expires_in": info["expires_at"] - current_ts  # return remaining seconds
+        "expires_in": info["expires_at"] - current_ts
     })
+
 # =========================
 # Timeline & Screenshots
 # =========================
