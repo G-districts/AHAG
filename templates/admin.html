@@ -61,7 +61,7 @@
 <h3>Settings</h3>
 <article>
   <label>Default Blocked Redirect URL 
-    <input id="blocked" type="url" value="{{ data.settings.blocked_redirect|default('https://blocked.gdistrict.org/Gschool%20block') }}">
+<input id="blocked" type="url" value="https://blocked.gdistrict.org/Gschool%20block">
   </label>
   <label>
     <input id="chat" type="checkbox" {{ 'checked' if data.settings.chat_enabled|default(False) else '' }}>
@@ -70,6 +70,8 @@
   <label>Extension Passcode
     <input id="passcode" type="password" placeholder="admin1234">
   </label>
+<button id="save">Save Settings</button>
+<p id="msg" class="mini"></p>
   <label>
     <input id="bypassEnabled" type="checkbox" {{ 'checked' if data.settings.bypass_enabled|default(False) else '' }}>
     Enable Bypass Override on Block Pages
