@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify, render_template, session, redirect, u
 from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
 from urllib.parse import urlparse
+import random
 from datetime import datetime
 from collections import defaultdict
 from image_filter_ai import classify_image as _gschool_classify_image
