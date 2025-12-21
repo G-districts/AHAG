@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html>
 <head>
@@ -71,48 +70,18 @@
   <label>Extension Passcode
     <input id="passcode" type="password" placeholder="admin1234">
   </label>
-</article>
-<article class="card">
-  <h3>Bypass Overrides</h3>
-
   <label>
-    <input id="bypassEnabled" type="checkbox">
+    <input id="bypassEnabled" type="checkbox" {{ 'checked' if data.settings.bypass_enabled|default(False) else '' }}>
     Enable Bypass Override on Block Pages
   </label>
-
-  <hr>
-
-  <h4>Create Temporary Bypass</h4>
-
-  <label>Allowed Duration (minutes)
-    <input id="bypassTTL" type="number" min="1" max="1440" value="10">
+  <label>Bypass Code
+    <input id="bypassCode" type="password" value="{{ data.settings.bypass_code|default('') }}" placeholder="e.g. secret123">
   </label>
-
-  <label>User (optional)
-    <input id="bypassUser" placeholder="student@school.org">
+  <label>Bypass Duration (minutes)
+    <input id="bypassTTL" type="number" min="1" max="1440" value="{{ data.settings.bypass_ttl_minutes|default(10) }}">
   </label>
-
-  <label>Allowed URLs (optional, one per line)
-    <textarea id="bypassUrls" rows="3" placeholder="https://youtube.com"></textarea>
-  </label>
-
-  <button id="createBypass">Generate Bypass Code</button>
-  <span id="createMsg"></span>
-
-  <hr>
-
-  <h4>Active Bypass Codes</h4>
-  <table id="bypassTable">
-    <thead>
-      <tr>
-        <th>Code</th>
-        <th>User</th>
-        <th>Expires In</th>
-        <th>URLs</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <button id="save">Save</button>
+  <small id="msg" style="margin-left:8px"></small>
 </article>
 
 <h3>Policies</h3>
@@ -346,6 +315,26 @@
 </article>
 
 <script>
+  // ============ Settings ============
+  document.getElementById('save').onclick = async () => {
+    const body = {
+      blocked_redirect: document.getElementById('blocked').value,
+      chat_enabled: document.getElementById('chat').checked,
+      passcode: document.getElementById('passcode').value,
+      bypass_enabled: document.getElementById('bypassEnabled').checked,
+      bypass_code: document.getElementById('bypassCode').value,
+      bypass_ttl_minutes: parseInt(document.getElementById('bypassTTL').value || '10', 10)
+    };
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const msg = document.getElementById('msg');
+    msg.textContent = r.ok ? 'Saved' : 'Error';
+    msg.style.color = r.ok ? 'green' : 'crimson';
+    setTimeout(()=>{ msg.textContent = ''; }, 1500);
+  };
 
   // ============ Policies (all blocking managed here) ============
   let POLICIES = {};
@@ -924,72 +913,6 @@
     loadImageFilterConfig();
     startImageFilterPolling();
   })();
-  async function api(url, body) {
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify(body || {})
-  });
-  return r.json();
-}
-
-const bypassEnabled = document.getElementById("bypassEnabled");
-const ttlInput = document.getElementById("bypassTTL");
-const userInput = document.getElementById("bypassUser");
-const urlsInput = document.getElementById("bypassUrls");
-const createBtn = document.getElementById("createBypass");
-const tableBody = document.querySelector("#bypassTable tbody");
-const msg = document.getElementById("createMsg");
-
-/* Save bypass enabled toggle */
-bypassEnabled.addEventListener("change", async () => {
-  await api("/api/settings", {
-    bypass_enabled: bypassEnabled.checked
-  });
-});
-
-/* Create bypass code */
-createBtn.onclick = async () => {
-  msg.textContent = "Generating…";
-
-  const res = await api("/api/admin/create-bypass", {
-    ttl_minutes: Number(ttlInput.value || 10),
-    user: userInput.value.trim(),
-    urls: urlsInput.value
-      .split("\n")
-      .map(u => u.trim())
-      .filter(Boolean)
-  });
-
-  if (!res.ok) {
-    msg.textContent = "Failed";
-    return;
-  }
-
-  msg.textContent = `Code: ${res.code} (expires in ${res.expires_in_minutes}m)`;
-  loadBypasses();
-};
-
-/* Load active bypasses */
-async function loadBypasses() {
-  const r = await fetch("/api/admin/list-bypasses");
-  const data = await r.json();
-
-  tableBody.innerHTML = "";
-  for (const b of data.bypasses) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><code>${b.code}</code></td>
-      <td>${b.user || "-"}</td>
-      <td>${b.expires_in}m</td>
-      <td>${(b.urls || []).join("<br>")}</td>
-    `;
-    tableBody.appendChild(tr);
-  }
-}
-
-loadBypasses();
 </script>
-
 </body>
 </html>
