@@ -1009,6 +1009,14 @@ def api_settings():
     if not u or u["role"] != "admin":
         return jsonify({"ok": False, "error": "forbidden"}), 403
     d = ensure_keys(load_data())
+
+
+    # ✅ NEW: allow admin to READ settings
+    if request.method == "GET":
+        return jsonify({
+            "ok": True,
+            "settings": d.get("settings", {})
+        })
     b = request.json or {}
 
     # existing settings
