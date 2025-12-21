@@ -1979,8 +1979,6 @@ def api_policy():
 @app.route("/api/bypass", methods=["POST"])
 def api_bypass():
     d = ensure_keys(load_data())
-
-    # Clean expired codes first
     cleanup_expired_bypasses(d)
 
     b = request.json or {}
@@ -2011,9 +2009,9 @@ def api_bypass():
         if not any(url.startswith(u) for u in info["urls"]):
             return jsonify({"ok": False, "allow": False, "error": "url_not_allowed"}), 403
 
-    # Extend the bypass TTL if you want it to remain valid for the configured time
-    ttl_minutes = settings.get("bypass_ttl_minutes", 10)
-    info["expires_at"] = current_ts + ttl_minutes * 60
+    # DO NOT overwrite the original TTL; keep expires_at as set when creating
+    # info["expires_at"] = current_ts + ttl_minutes * 60  <-- REMOVE THIS
+
     save_data(d)
 
     # Log usage
