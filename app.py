@@ -524,21 +524,21 @@ def create_bypass():
     user = (b.get("user") or "").strip()
     urls = b.get("urls") or []
 
-    # Try per-request TTL first
-    ttl = b.get("ttl_minutes")
-    if ttl is not None:
-        try:
-            ttl = int(ttl)
-        except ValueError:
-            ttl = None
+    # ======== Handle TTL ========
+    default_ttl = d.get("settings", {}).get("bypass_ttl_minutes", 10)
+    ttl = b.get("ttl_minutes", default_ttl)
 
-    # Fallback to global setting if per-request not valid
-    if ttl is None:
-        ttl = d.get("settings", {}).get("bypass_ttl_minutes", 10)
+    try:
+        ttl = int(ttl)
+        if ttl < 1:  # clamp minimum
+            ttl = default_ttl
+    except (ValueError, TypeError):
+        ttl = default_ttl
 
-    # Clamp TTL to [1, 1440]
-    ttl = max(1, min(ttl, 1440))
+    # Clamp maximum to 1 day
+    ttl = min(ttl, 1440)
 
+    # ======== Generate bypass code ========
     code = generate_bypass_code()
     expires_at = now_ts() + ttl * 60
 
