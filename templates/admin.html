@@ -74,9 +74,21 @@
     <input id="bypassEnabled" type="checkbox" {{ 'checked' if data.settings.bypass_enabled|default(False) else '' }}>
     Enable Bypass Override on Block Pages
   </label>
-  <label>Bypass Code
-    <input id="bypassCode" type="password" value="{{ data.settings.bypass_code|default('') }}" placeholder="e.g. secret123">
-  </label>
+  <label>Bypass Code (One-Time)</label>
+<div style="display:flex; gap:0.5rem; align-items:center;">
+  <input
+    id="bypassCode"
+    type="text"
+    readonly
+    placeholder="Click Generate"
+    style="font-weight:bold;"
+  >
+  <button id="generateBypass" type="button">Generate</button>
+</div>
+<small class="mini">
+  Auto-generated 6-digit code. Must be regenerated each time.
+</small>
+
   <label>Bypass Duration (minutes)
     <input id="bypassTTL" type="number" min="1" max="1440" value="{{ data.settings.bypass_ttl_minutes|default(10) }}">
   </label>
@@ -666,6 +678,28 @@
       if (msg) { msg.textContent = 'Error deleting policy'; msg.style.color = 'crimson'; }
     }
   }
+
+  // ============ One-Time Bypass Code ============
+const bypassInput = document.getElementById('bypassCode');
+const genBypassBtn = document.getElementById('generateBypass');
+
+function generateSixDigitCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+genBypassBtn.onclick = () => {
+  const code = generateSixDigitCode();
+
+  // Show ONCE
+  bypassInput.value = code;
+
+  // Auto-clear after 30 seconds (optional but recommended)
+  setTimeout(() => {
+    if (bypassInput.value === code) {
+      bypassInput.value = '';
+    }
+  }, 30000);
+};
 
   // ============ SIMPLE USER MANAGEMENT ============
   document.getElementById('saveUser').onclick = async ()=>{
