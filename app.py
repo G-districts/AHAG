@@ -1,4 +1,3 @@
-
 # =========================
 # G-SCHOOLS CONNECT BACKEND
 # =========================
@@ -8,7 +7,6 @@ from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
 from urllib.parse import urlparse
 from datetime import datetime
-import secrets
 from collections import defaultdict
 from image_filter_ai import classify_image as _gschool_classify_image
 
@@ -25,6 +23,7 @@ try:
     app.register_blueprint(ai_blueprint)
 except Exception as e:
     print("[WARN] Failed to register AI blueprint:", e)
+
 
 def _ice_servers():
     # Always include Google STUN
@@ -51,21 +50,6 @@ SCENES_PATH = os.path.join(ROOT, "scenes.json")
 # =========================
 # Helpers: Data & Database
 # =========================
-
-# Example in-memory store (replace with persistent DB if needed)
-bypass_codes = {}  # {code: expire_timestamp}
-
-def generate_bypass_code(ttl_minutes=10):
-    code = secrets.token_urlsafe(6)  # random 8-character code
-    expire_at = time.time() + ttl_minutes * 60
-    bypass_codes[code] = expire_at
-    return code
-
-def clean_expired_codes():
-    now = time.time()
-    expired = [c for c, t in bypass_codes.items() if t < now]
-    for c in expired:
-        del bypass_codes[c]
 
 def db():
     """Open sqlite connection (row factory stays default to keep light)."""
@@ -1905,43 +1889,32 @@ def api_policy():
         "bypass_ttl_minutes": int(d.get("settings", {}).get("bypass_ttl_minutes", 10)),
     }
     return jsonify(resp)
-
-@app.route("/api/generate_bypass", methods=["POST"])
-def api_generate_bypass():
-    """
-    Admin endpoint to generate a one-time bypass code.
-    Accepts optional TTL in minutes.
-    """
-    b = request.json or {}
-    ttl = int(b.get("ttl_minutes", 10))
-    ttl = max(1, min(ttl, 1440))  # clamp between 1 min and 24h
-
-    code = generate_bypass_code(ttl)
-    return jsonify({"ok": True, "code": code, "ttl_minutes": ttl})
-
 @app.route("/api/bypass", methods=["POST"])
 def api_bypass():
     """
-    Called when a user enters a bypass code.
-    Checks the code against active one-time codes.
+    Called by the block page / extension when a user enters the bypass code.
+    Checks the code against admin settings and returns allow/deny.
     """
-    clean_expired_codes()  # remove expired codes
-
+    d = ensure_keys(load_data())
     b = request.json or {}
     code = (b.get("code") or "").strip()
     url = (b.get("url") or "").strip()
     user = (b.get("user") or "").strip()
 
-    if code not in bypass_codes:
-        return jsonify({"ok": False, "allow": False, "error": "invalid or expired"}), 403
+    settings = d.get("settings", {})
+    if not settings.get("bypass_enabled"):
+        return jsonify({"ok": False, "allow": False, "error": "disabled"}), 403
 
-    # Code is valid — remove it so it can't be reused
-    del bypass_codes[code]
+    expected = (settings.get("bypass_code") or "").strip()
+    if not expected or expected != code:
+        return jsonify({"ok": False, "allow": False, "error": "invalid"}), 403
 
     # Optional: log bypass usage
-    log_action({"event": "bypass_used", "user": user, "url": url, "code": code})
+    log_action({"event": "bypass_used", "user": user, "url": url})
 
     return jsonify({"ok": True, "allow": True})
+
+
 # =========================
 # Timeline & Screenshots
 # =========================
