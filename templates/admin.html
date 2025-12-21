@@ -708,21 +708,21 @@ genBypassBtn.onclick = async () => {
     const r = await fetch('/api/bypass/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ttl_minutes: ttl })
+      body: JSON.stringify({ ttl_minutes: ttl })  // <-- send TTL from admin page
     });
     const j = await r.json();
     if (!j.ok) throw new Error('Generate failed');
 
-    // Display code once
+    // Show code
     bypassInput.value = j.code;
 
     // Auto-fill extension passcode
     passcodeField.value = j.code;
 
-    // Persist settings with this code
+    // Persist settings
     await saveSettingsWithPasscode(j.code);
 
-    // Auto-clear after TTL expires
+    // Reset passcode AFTER TTL expires
     setTimeout(async () => {
       if (passcodeField.value === j.code) {
         passcodeField.value = '';
@@ -730,11 +730,9 @@ genBypassBtn.onclick = async () => {
       }
     }, j.ttl_minutes * 60 * 1000);
 
-    // Clear the displayed code after 30s (UI only)
+    // UI-only clear after 30s
     setTimeout(() => {
-      if (bypassInput.value === j.code) {
-        bypassInput.value = '';
-      }
+      if (bypassInput.value === j.code) bypassInput.value = '';
     }, 30000);
 
   } catch (e) {
