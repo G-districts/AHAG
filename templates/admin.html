@@ -78,9 +78,12 @@
 <div style="display:flex; align-items:center; gap:0.5rem;">
   <button id="generateBypassBtn" class="secondary">Generate Code</button>
   <input id="generatedBypass" type="text" readonly placeholder="Your code will appear here">
+  <label style="margin-left:0.5rem;">
+    TTL (minutes)
+    <input id="bypassTTL" type="number" value="10" min="1" style="width:60px">
+  </label>
   <small id="generatedBypassTTL"></small>
 </div>
-
 <h3>Policies</h3>
 <article>
   <p class="mini">
