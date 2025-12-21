@@ -695,14 +695,12 @@ async function saveSettingsWithPasscode(passcodeValue) {
     }
   }
 
- // ============ One-Time Bypass Code (MULTI + TTL) ============
-const bypassInput = document.getElementById('bypassCode');
+ const bypassInput = document.getElementById('bypassCode');
 const genBypassBtn = document.getElementById('generateBypass');
 const ttlInput = document.getElementById('bypassTTL');
 
 genBypassBtn.onclick = async () => {
   bypassInput.value = 'Generating…';
-
   const ttl = parseInt(ttlInput.value || '10', 10);
   const passcodeField = document.getElementById('passcode');
 
@@ -712,28 +710,27 @@ genBypassBtn.onclick = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ttl_minutes: ttl })
     });
-
     const j = await r.json();
-    if (!j.ok) throw new Error('generate failed');
+    if (!j.ok) throw new Error('Generate failed');
 
-    // Show ONCE
+    // Display code once
     bypassInput.value = j.code;
 
-    // 🔐 Auto-fill extension passcode
+    // Auto-fill extension passcode
     passcodeField.value = j.code;
 
-    // 💾 Persist it
+    // Persist settings with this code
     await saveSettingsWithPasscode(j.code);
 
-    // ⏱ Auto-reset AFTER TTL expires
+    // Auto-clear after TTL expires
     setTimeout(async () => {
       if (passcodeField.value === j.code) {
         passcodeField.value = '';
         await saveSettingsWithPasscode('');
       }
-    }, ttl * 60 * 1000);
+    }, j.ttl_minutes * 60 * 1000);
 
-    // UI-only clear of bypass display (security)
+    // Clear the displayed code after 30s (UI only)
     setTimeout(() => {
       if (bypassInput.value === j.code) {
         bypassInput.value = '';
