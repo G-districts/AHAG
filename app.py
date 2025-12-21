@@ -8,7 +8,6 @@ import json, os, time, sqlite3, traceback, uuid, re
 import time
 import secrets
 import string
-from datetime import datetime, timezone
 from urllib.parse import urlparse
 from datetime import datetime
 from collections import defaultdict
@@ -54,21 +53,6 @@ SCENES_PATH = os.path.join(ROOT, "scenes.json")
 # =========================
 # Helpers: Data & Database
 # =========================
-def now_ts():
-    """Return current UTC timestamp as int."""
-    return int(datetime.now(tz=timezone.utc).timestamp())
-
-def cleanup_expired_bypasses(data):
-    """Remove any bypass codes that have expired."""
-    bypasses = data.get("bypass_codes", {})
-    removed = []
-    for code, info in list(bypasses.items()):
-        if info.get("expires_at", 0) <= now_ts():
-            del bypasses[code]
-            removed.append(code)
-    if removed:
-        save_data(data)
-    return removed
 
 def db():
     """Open sqlite connection (row factory stays default to keep light)."""
@@ -505,9 +489,6 @@ def index():
 def login_page():
     return render_template("login.html")
 
-
-    return jsonify({"ok": True, "bypass_enabled": bypass_enabled})
-
 @app.route("/admin")
 def admin_page():
     u = current_user()
@@ -523,20 +504,16 @@ def create_bypass():
     b = request.json or {}
     user = (b.get("user") or "").strip()
     urls = b.get("urls") or []
+    ttl = int(b.get("ttl_minutes", 10))
 
-    # Read TTL from frontend input
-    try:
-        ttl = int(b.get("ttl_minutes", 10))  # fallback to 10 if missing
-    except (TypeError, ValueError):
-        ttl = 10
-
-    # Clamp TTL to valid range
-    ttl = max(1, min(ttl, 1440))
+    if ttl < 1:
+        ttl = 1
+    if ttl > 1440:
+        ttl = 1440
 
     code = generate_bypass_code()
-    expires_at = now_ts() + ttl * 60
+    expires_at = now() + ttl * 60
 
-    # Save the bypass code
     d.setdefault("bypass_codes", {})[code] = {
         "expires_at": expires_at,
         "user": user,
@@ -1023,24 +1000,12 @@ def api_data():
             }
         }
     })
-@app.route("/api/settings", methods=["GET", "POST"])
+@app.route("/api/settings", methods=["POST"])
 def api_settings():
     u = current_user()
     if not u or u["role"] != "admin":
         return jsonify({"ok": False, "error": "forbidden"}), 403
-
     d = ensure_keys(load_data())
-
-    # ✅ NEW: allow admin to READ settings
-    if request.method == "GET":
-        return jsonify({
-            "ok": True,
-            "settings": d.get("settings", {})
-        })
-
-    # ===============================
-    # EXISTING LOGIC (UNCHANGED)
-    # ===============================
     b = request.json or {}
 
     # existing settings
@@ -1975,7 +1940,6 @@ def api_policy():
         "bypass_ttl_minutes": int(d.get("settings", {}).get("bypass_ttl_minutes", 10)),
     }
     return jsonify(resp)
-
 @app.route("/api/bypass", methods=["POST"])
 def api_bypass():
     d = ensure_keys(load_data())
@@ -1987,7 +1951,7 @@ def api_bypass():
     user = (b.get("user") or "").strip()
 
     settings = d.get("settings", {})
-    if not settings.get("bypass_enabled", True):
+    if not settings.get("bypass_enabled"):
         return jsonify({"ok": False, "allow": False, "error": "disabled"}), 403
 
     bypasses = d.get("bypass_codes", {})
@@ -1996,38 +1960,24 @@ def api_bypass():
     if not info:
         return jsonify({"ok": False, "allow": False, "error": "invalid_or_expired"}), 403
 
-    current_ts = now_ts()
-
-    # Remove expired codes
-    if current_ts > info["expires_at"]:
+    if info["expires_at"] <= now():
         del bypasses[code]
         save_data(d)
         return jsonify({"ok": False, "allow": False, "error": "expired"}), 403
 
-    # Optional URL restriction
-    if info.get("urls") and url:
-        if not any(url.startswith(u) for u in info["urls"]):
-            return jsonify({"ok": False, "allow": False, "error": "url_not_allowed"}), 403
+    # URL check (optional but recommended)
+    if info["urls"] and not any(url.startswith(u) for u in info["urls"]):
+        return jsonify({"ok": False, "allow": False, "error": "url_not_allowed"}), 403
 
-    # DO NOT overwrite the original TTL; keep expires_at as set when creating
-    # info["expires_at"] = current_ts + ttl_minutes * 60  <-- REMOVE THIS
-
-    save_data(d)
-
-    # Log usage
     log_action({
         "event": "bypass_used",
         "user": user,
         "url": url,
-        "code": code,
-        "expires_in": info["expires_at"] - current_ts
+        "code": code
     })
 
-    return jsonify({
-        "ok": True,
-        "allow": True,
-        "expires_in": info["expires_at"] - current_ts
-    })
+    return jsonify({"ok": True, "allow": True})
+
 
 # =========================
 # Timeline & Screenshots
@@ -2102,25 +2052,7 @@ def api_policies():
     return jsonify({"ok": True, "id": pid, "policy": policies[pid]})
 
 
-@app.route("/api/admin/list-bypasses", methods=["GET"])
-def list_bypasses():
-    d = ensure_keys(load_data())
-    cleanup_expired_bypasses(d)
 
-    t = now()
-    out = []
-
-    for code, info in d.get("bypass_codes", {}).items():
-        expires_in = max(0, int((info["expires_at"] - t) / 60))
-        out.append({
-            "code": code,
-            "user": info.get("user", ""),
-            "urls": info.get("urls", []),
-            "expires_in": expires_in
-        })
-
-    return jsonify({"bypasses": out})
- 
 @app.route("/api/policy_assignments", methods=["GET", "POST"])
 @app.route("/api/policy_assignments", methods=["GET", "POST"])
 def api_policy_assignments():
