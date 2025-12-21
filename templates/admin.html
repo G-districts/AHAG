@@ -74,10 +74,12 @@
 <article class="card">
   <h3>Bypass Overrides</h3>
 
-<label>
-  <input id="bypassEnabled" type="checkbox">
-  Enable Bypass Override on Block Pages
-</label>
+  <label>
+    <input id="bypassEnabled" type="checkbox">
+    Enable Bypass Override on Block Pages
+  </label>
+
+  <hr>
 
   <h4>Create Temporary Bypass</h4>
 
@@ -343,6 +345,26 @@
 </article>
 
 <script>
+  // ============ Settings ============
+  document.getElementById('save').onclick = async () => {
+    const body = {
+      blocked_redirect: document.getElementById('blocked').value,
+      chat_enabled: document.getElementById('chat').checked,
+      passcode: document.getElementById('passcode').value,
+      bypass_enabled: document.getElementById('bypassEnabled').checked,
+      bypass_code: document.getElementById('bypassCode').value,
+      bypass_ttl_minutes: parseInt(document.getElementById('bypassTTL').value || '10', 10)
+    };
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const msg = document.getElementById('msg');
+    msg.textContent = r.ok ? 'Saved' : 'Error';
+    msg.style.color = r.ok ? 'green' : 'crimson';
+    setTimeout(()=>{ msg.textContent = ''; }, 1500);
+  };
 
   // ============ Policies (all blocking managed here) ============
   let POLICIES = {};
@@ -937,26 +959,6 @@ const urlsInput = document.getElementById("bypassUrls");
 const createBtn = document.getElementById("createBypass");
 const tableBody = document.querySelector("#bypassTable tbody");
 const msg = document.getElementById("createMsg");
-
-async function loadSettings() {
-  try {
-    const r = await fetch("/api/settings"); // REAL GET
-    if (!r.ok) return;
-
-    const res = await r.json();
-
-    if (res.settings && typeof res.settings.bypass_enabled !== "undefined") {
-      bypassEnabled.checked = !!res.settings.bypass_enabled;
-    }
-  } catch (e) {
-    console.error("Failed to load settings", e);
-  }
-}
-
-window.addEventListener("DOMContentLoaded", loadSettings);
-
-
-loadSettings();
 
 /* Save bypass enabled toggle */
 bypassEnabled.addEventListener("change", async () => {
