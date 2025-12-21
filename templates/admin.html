@@ -61,7 +61,7 @@
 <h3>Settings</h3>
 <article>
   <label>Default Blocked Redirect URL 
-<input id="blocked" type="url" value="https://blocked.gdistrict.org/Gschool%20block">
+    <input id="blocked" type="url" value="{{ data.settings.blocked_redirect|default('https://blocked.gdistrict.org/Gschool%20block') }}">
   </label>
   <label>
     <input id="chat" type="checkbox" {{ 'checked' if data.settings.chat_enabled|default(False) else '' }}>
@@ -70,22 +70,20 @@
   <label>Extension Passcode
     <input id="passcode" type="password" placeholder="admin1234">
   </label>
-<button id="save">Save Settings</button>
-<p id="msg" class="mini"></p>
   <label>
     <input id="bypassEnabled" type="checkbox" {{ 'checked' if data.settings.bypass_enabled|default(False) else '' }}>
     Enable Bypass Override on Block Pages
   </label>
-<label>Generate One-Time Bypass Code</label>
-<div style="display:flex; align-items:center; gap:0.5rem;">
-  <button id="generateBypassBtn" class="secondary">Generate Code</button>
-  <input id="generatedBypass" type="text" readonly placeholder="Your code will appear here">
-  <label style="margin-left:0.5rem;">
-    TTL (minutes)
-    <input id="bypassTTL" type="number" value="10" min="1" style="width:60px">
+  <label>Bypass Code
+    <input id="bypassCode" type="password" value="{{ data.settings.bypass_code|default('') }}" placeholder="e.g. secret123">
   </label>
-  <small id="generatedBypassTTL"></small>
-</div>
+  <label>Bypass Duration (minutes)
+    <input id="bypassTTL" type="number" min="1" max="1440" value="{{ data.settings.bypass_ttl_minutes|default(10) }}">
+  </label>
+  <button id="save">Save</button>
+  <small id="msg" style="margin-left:8px"></small>
+</article>
+
 <h3>Policies</h3>
 <article>
   <p class="mini">
@@ -834,29 +832,6 @@
       }
     }
   }
-
-  document.getElementById('generateBypassBtn').onclick = async () => {
-  const ttl = 10; // default TTL in minutes, or you can add an input for it
-  try {
-    const r = await fetch('/api/generate_bypass', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ttl_minutes: ttl})
-    });
-    if (!r.ok) throw new Error('Failed to generate bypass');
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'Unknown error');
-
-    const codeEl = document.getElementById('generatedBypass');
-    const ttlEl = document.getElementById('generatedBypassTTL');
-
-    codeEl.value = j.code || '';
-    ttlEl.textContent = `Expires in ${j.ttl_minutes} min`;
-  } catch (e) {
-    console.error('generate bypass error', e);
-    alert('Could not generate bypass code: ' + e.message);
-  }
-};
 
   function renderImageFilterEvents(events) {
     const tbody = document.getElementById('imgFilterEventsBody');
