@@ -86,7 +86,8 @@
   <button id="generateBypass" type="button">Generate</button>
 </div>
 <small class="mini">
-  Auto-generated 6-digit code. Must be regenerated each time.
+  Auto-generated 6-digit bypass code. Multiple active codes are allowed.
+  Each code expires automatically after its TTL.
 </small>
 
   <label>Bypass Duration (minutes)
@@ -328,14 +329,29 @@
 
 <script>
   // ============ Settings ============
+
+async function saveSettingsWithPasscode(passcodeValue) {
+  const body = {
+    blocked_redirect: document.getElementById('blocked').value,
+    chat_enabled: document.getElementById('chat').checked,
+    passcode: passcodeValue,
+    bypass_enabled: document.getElementById('bypassEnabled').checked
+  };
+
+  await fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+}
+
   document.getElementById('save').onclick = async () => {
     const body = {
       blocked_redirect: document.getElementById('blocked').value,
       chat_enabled: document.getElementById('chat').checked,
       passcode: document.getElementById('passcode').value,
       bypass_enabled: document.getElementById('bypassEnabled').checked,
-      bypass_code: document.getElementById('bypassCode').value,
-      bypass_ttl_minutes: parseInt(document.getElementById('bypassTTL').value || '10', 10)
+
     };
     const r = await fetch('/api/settings', {
       method: 'POST',
@@ -679,27 +695,59 @@
     }
   }
 
-  // ============ One-Time Bypass Code ============
+ // ============ One-Time Bypass Code (MULTI + TTL) ============
 const bypassInput = document.getElementById('bypassCode');
 const genBypassBtn = document.getElementById('generateBypass');
+const ttlInput = document.getElementById('bypassTTL');
 
-function generateSixDigitCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+genBypassBtn.onclick = async () => {
+  bypassInput.value = 'Generating…';
 
-genBypassBtn.onclick = () => {
-  const code = generateSixDigitCode();
+  const ttl = parseInt(ttlInput.value || '10', 10);
+  const passcodeField = document.getElementById('passcode');
 
-  // Show ONCE
-  bypassInput.value = code;
+  try {
+    const r = await fetch('/api/bypass/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ttl_minutes: ttl })
+    });
 
-  // Auto-clear after 30 seconds (optional but recommended)
-  setTimeout(() => {
-    if (bypassInput.value === code) {
-      bypassInput.value = '';
-    }
-  }, 30000);
+    const j = await r.json();
+    if (!j.ok) throw new Error('generate failed');
+
+    // Show ONCE
+    bypassInput.value = j.code;
+
+    // 🔐 Auto-fill extension passcode
+    passcodeField.value = j.code;
+
+    // 💾 Persist it
+    await saveSettingsWithPasscode(j.code);
+
+    // ⏱ Auto-reset AFTER TTL expires
+    setTimeout(async () => {
+      if (passcodeField.value === j.code) {
+        passcodeField.value = '';
+        await saveSettingsWithPasscode('');
+      }
+    }, ttl * 60 * 1000);
+
+    // UI-only clear of bypass display (security)
+    setTimeout(() => {
+      if (bypassInput.value === j.code) {
+        bypassInput.value = '';
+      }
+    }, 30000);
+
+  } catch (e) {
+    console.error('Bypass generate error', e);
+    bypassInput.value = '';
+    alert('Failed to generate bypass code');
+  }
 };
+
+
 
   // ============ SIMPLE USER MANAGEMENT ============
   document.getElementById('saveUser').onclick = async ()=>{
