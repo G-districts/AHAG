@@ -2052,7 +2052,25 @@ def api_policies():
     return jsonify({"ok": True, "id": pid, "policy": policies[pid]})
 
 
+@app.route("/api/admin/list-bypasses", methods=["GET"])
+def list_bypasses():
+    d = ensure_keys(load_data())
+    cleanup_expired_bypasses(d)
 
+    t = now()
+    out = []
+
+    for code, info in d.get("bypass_codes", {}).items():
+        expires_in = max(0, int((info["expires_at"] - t) / 60))
+        out.append({
+            "code": code,
+            "user": info.get("user", ""),
+            "urls": info.get("urls", []),
+            "expires_in": expires_in
+        })
+
+    return jsonify({"bypasses": out})
+ 
 @app.route("/api/policy_assignments", methods=["GET", "POST"])
 @app.route("/api/policy_assignments", methods=["GET", "POST"])
 def api_policy_assignments():
