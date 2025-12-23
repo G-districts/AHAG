@@ -14,10 +14,10 @@ import jwt
 from functools import wraps
 import plistlib
 import uuid
-from apns2.client import APNsClient
-from apns2.payload import Payload
+from apns_mdm import send_mdm_push
 
-APNS_CERT = os.path.join("certs", "mdm_push.pem")
+
+APNS_CERT = "certs/mdm_push.pem"
 APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
 
 apns_client = APNsClient(
@@ -1488,10 +1488,18 @@ def update_mdm_profile(child_email):
     if not device_token:
         return jsonify({"ok": False, "error": "No device token for child"}), 400
 
-    try:
-        # Send APNs push to device telling it to fetch the latest profile
-        payload = Payload(custom={"mdm": f"https://gschool.gdistrict.org/gprotect/mdm/profile/{child_email}"})
-        apns_client.send_notification(device_token, payload, APNS_TOPIC)
+try:
+    # Wake the device via APNs (MDM-style push)
+    send_mdm_push(device_token)
+
+    log_action({
+        "event": "gprotect_mdm_update_sent",
+        "child": child_email,
+        "timestamp": int(time.time())
+    })
+
+    return jsonify({"ok": True, "message": "Update pushed to device"})
+
 
         log_action({
             "event": "gprotect_mdm_update_sent",
