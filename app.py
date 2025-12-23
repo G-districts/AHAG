@@ -315,7 +315,562 @@ def _is_guest_identity(email: str, name: str) -> bool:
     if any(t in n for t in _GUEST_TOKENS):
         return True
     return False
+#=========================
+Parental control
+#=========================
+# =========================
+# GPROTECT - PARENT CONTROLS
+# =========================
 
+# Add these imports at the top of app.py if not already present
+from datetime import datetime, time as dt_time
+import jwt
+from functools import wraps
+
+# JWT secret for parent tokens (add to top of file)
+PARENT_JWT_SECRET = os.environ.get("PARENT_JWT_SECRET", "gprotect_secret_key_change_in_production")
+
+def parent_required(f):
+    """Decorator to require parent authentication"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not token:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+        try:
+            data = jwt.decode(token, PARENT_JWT_SECRET, algorithms=["HS256"])
+            request.parent_email = data.get('email')
+        except Exception:
+            return jsonify({"ok": False, "error": "invalid token"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+def _ensure_gprotect_structure(d):
+    """Ensure GProtect data structure exists"""
+    d.setdefault("gprotect", {
+        "parents": {},  # email -> {password, children: [emails], settings}
+        "children": {},  # child_email -> parent_email
+        "schedules": {},  # child_email -> schedule config
+        "ai_categories": {},  # child_email -> {category_name: blocked}
+        "manual_blocks": {},  # child_email -> [urls]
+        "manual_allows": {},  # child_email -> [urls]
+        "active_sessions": {},  # child_email -> current active restrictions
+        "mdm_tokens": {},  # child_email -> iOS MDM token
+        "logs": []  # activity logs
+    })
+    return d
+
+# =========================
+# Parent Authentication
+# =========================
+
+@app.route("/gprotect/parent/register", methods=["POST"])
+def gprotect_parent_register():
+    """Register a new parent account"""
+    body = request.json or {}
+    email = (body.get("email") or "").strip().lower()
+    password = body.get("password") or ""
+    name = (body.get("name") or "").strip()
+    
+    if not email or not password or len(password) < 6:
+        return jsonify({"ok": False, "error": "Invalid email or password too short"}), 400
+    
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    if email in d["gprotect"]["parents"]:
+        return jsonify({"ok": False, "error": "Parent already exists"}), 400
+    
+    d["gprotect"]["parents"][email] = {
+        "password": password,  # In production, use bcrypt!
+        "name": name,
+        "children": [],
+        "created_at": int(time.time())
+    }
+    
+    save_data(d)
+    
+    token = jwt.encode({"email": email, "exp": int(time.time()) + 86400 * 30}, PARENT_JWT_SECRET, algorithm="HS256")
+    
+    log_action({"event": "gprotect_parent_register", "email": email})
+    return jsonify({"ok": True, "token": token, "email": email, "name": name})
+
+@app.route("/gprotect/parent/login", methods=["POST"])
+def gprotect_parent_login():
+    """Parent login"""
+    body = request.json or {}
+    email = (body.get("email") or "").strip().lower()
+    password = body.get("password") or ""
+    
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    parent = d["gprotect"]["parents"].get(email)
+    if not parent or parent.get("password") != password:
+        return jsonify({"ok": False, "error": "Invalid credentials"}), 401
+    
+    token = jwt.encode({"email": email, "exp": int(time.time()) + 86400 * 30}, PARENT_JWT_SECRET, algorithm="HS256")
+    
+    return jsonify({
+        "ok": True,
+        "token": token,
+        "email": email,
+        "name": parent.get("name", ""),
+        "children": parent.get("children", [])
+    })
+
+# =========================
+# Child Management
+# =========================
+
+@app.route("/gprotect/children", methods=["GET", "POST"])
+@parent_required
+def gprotect_children():
+    """Manage children"""
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    parent_email = request.parent_email
+    
+    if request.method == "GET":
+        parent = d["gprotect"]["parents"].get(parent_email, {})
+        children_list = []
+        for child_email in parent.get("children", []):
+            children_list.append({
+                "email": child_email,
+                "schedules": d["gprotect"]["schedules"].get(child_email, {}),
+                "ai_categories": d["gprotect"]["ai_categories"].get(child_email, {}),
+                "manual_blocks": d["gprotect"]["manual_blocks"].get(child_email, []),
+                "manual_allows": d["gprotect"]["manual_allows"].get(child_email, [])
+            })
+        return jsonify({"ok": True, "children": children_list})
+    
+    # POST - Add child
+    body = request.json or {}
+    child_email = (body.get("email") or "").strip().lower()
+    
+    if not child_email or "@" not in child_email:
+        return jsonify({"ok": False, "error": "Invalid email"}), 400
+    
+    # Check if child already has a parent
+    if child_email in d["gprotect"]["children"]:
+        return jsonify({"ok": False, "error": "Child already registered"}), 400
+    
+    parent = d["gprotect"]["parents"].get(parent_email, {})
+    if child_email not in parent.get("children", []):
+        parent.setdefault("children", []).append(child_email)
+    
+    d["gprotect"]["children"][child_email] = parent_email
+    d["gprotect"]["parents"][parent_email] = parent
+    
+    # Initialize defaults
+    d["gprotect"]["schedules"].setdefault(child_email, {
+        "screen_time": {"enabled": False, "daily_minutes": 120, "timezone": "America/Los_Angeles"},
+        "school_hours": {"enabled": False, "start": "08:00", "end": "15:00", "days": [1,2,3,4,5], "block_all": False},
+        "homework_hours": {"enabled": False, "start": "15:30", "end": "18:00", "days": [1,2,3,4,5], "allow_educational": True},
+        "downtime": {"enabled": False, "start": "21:00", "end": "07:00", "block_all": True}
+    })
+    
+    save_data(d)
+    log_action({"event": "gprotect_child_added", "parent": parent_email, "child": child_email})
+    
+    return jsonify({"ok": True, "child": child_email})
+
+@app.route("/gprotect/children/<child_email>", methods=["DELETE"])
+@parent_required
+def gprotect_remove_child(child_email):
+    """Remove a child"""
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    parent_email = request.parent_email
+    
+    parent = d["gprotect"]["parents"].get(parent_email, {})
+    if child_email not in parent.get("children", []):
+        return jsonify({"ok": False, "error": "Not your child"}), 403
+    
+    parent["children"].remove(child_email)
+    d["gprotect"]["parents"][parent_email] = parent
+    d["gprotect"]["children"].pop(child_email, None)
+    d["gprotect"]["schedules"].pop(child_email, None)
+    d["gprotect"]["ai_categories"].pop(child_email, None)
+    d["gprotect"]["manual_blocks"].pop(child_email, None)
+    d["gprotect"]["manual_allows"].pop(child_email, None)
+    
+    save_data(d)
+    return jsonify({"ok": True})
+
+# =========================
+# AI Categories Management
+# =========================
+
+@app.route("/gprotect/ai/categories", methods=["GET"])
+def gprotect_get_ai_categories():
+    """Get available AI categories"""
+    d = ensure_keys(load_data())
+    categories = []
+    
+    for name, cat in d.get("categories", {}).items():
+        categories.append({
+            "id": name,
+            "name": name,
+            "ai_labels": cat.get("ai_labels", []),
+            "description": cat.get("description", "")
+        })
+    
+    return jsonify({"ok": True, "categories": categories})
+
+@app.route("/gprotect/ai/categories/<child_email>", methods=["GET", "POST"])
+@parent_required
+def gprotect_manage_ai_categories(child_email):
+    """Manage AI category blocks for a child"""
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    parent_email = request.parent_email
+    
+    parent = d["gprotect"]["parents"].get(parent_email, {})
+    if child_email not in parent.get("children", []):
+        return jsonify({"ok": False, "error": "Not your child"}), 403
+    
+    if request.method == "GET":
+        return jsonify({
+            "ok": True,
+            "categories": d["gprotect"]["ai_categories"].get(child_email, {})
+        })
+    
+    # POST - Update categories
+    body = request.json or {}
+    categories = body.get("categories", {})
+    
+    d["gprotect"]["ai_categories"][child_email] = categories
+    
+    # Push policy refresh to child
+    d.setdefault("pending_per_student", {}).setdefault(child_email, []).append({
+        "type": "gprotect_refresh"
+    })
+    
+    save_data(d)
+    log_action({"event": "gprotect_ai_categories_update", "parent": parent_email, "child": child_email})
+    
+    return jsonify({"ok": True, "categories": categories})
+
+# =========================
+# Manual Blocks/Allows
+# =========================
+
+@app.route("/gprotect/manual/<child_email>", methods=["GET", "POST"])
+@parent_required
+def gprotect_manage_manual(child_email):
+    """Manage manual blocks and allows"""
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    parent_email = request.parent_email
+    
+    parent = d["gprotect"]["parents"].get(parent_email, {})
+    if child_email not in parent.get("children", []):
+        return jsonify({"ok": False, "error": "Not your child"}), 403
+    
+    if request.method == "GET":
+        return jsonify({
+            "ok": True,
+            "blocks": d["gprotect"]["manual_blocks"].get(child_email, []),
+            "allows": d["gprotect"]["manual_allows"].get(child_email, [])
+        })
+    
+    # POST - Update manual lists
+    body = request.json or {}
+    
+    if "blocks" in body:
+        d["gprotect"]["manual_blocks"][child_email] = body["blocks"]
+    
+    if "allows" in body:
+        d["gprotect"]["manual_allows"][child_email] = body["allows"]
+    
+    # Push refresh
+    d.setdefault("pending_per_student", {}).setdefault(child_email, []).append({
+        "type": "gprotect_refresh"
+    })
+    
+    save_data(d)
+    log_action({"event": "gprotect_manual_update", "parent": parent_email, "child": child_email})
+    
+    return jsonify({"ok": True})
+
+# =========================
+# Schedule Management
+# =========================
+
+@app.route("/gprotect/schedules/<child_email>", methods=["GET", "POST"])
+@parent_required
+def gprotect_manage_schedules(child_email):
+    """Manage time schedules"""
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    parent_email = request.parent_email
+    
+    parent = d["gprotect"]["parents"].get(parent_email, {})
+    if child_email not in parent.get("children", []):
+        return jsonify({"ok": False, "error": "Not your child"}), 403
+    
+    if request.method == "GET":
+        return jsonify({
+            "ok": True,
+            "schedules": d["gprotect"]["schedules"].get(child_email, {})
+        })
+    
+    # POST - Update schedules
+    body = request.json or {}
+    schedule_type = body.get("type")  # screen_time, school_hours, homework_hours, downtime
+    config = body.get("config", {})
+    
+    if schedule_type not in ["screen_time", "school_hours", "homework_hours", "downtime"]:
+        return jsonify({"ok": False, "error": "Invalid schedule type"}), 400
+    
+    schedules = d["gprotect"]["schedules"].get(child_email, {})
+    schedules[schedule_type] = config
+    d["gprotect"]["schedules"][child_email] = schedules
+    
+    # Push refresh
+    d.setdefault("pending_per_student", {}).setdefault(child_email, []).append({
+        "type": "gprotect_refresh"
+    })
+    
+    save_data(d)
+    log_action({"event": "gprotect_schedule_update", "parent": parent_email, "child": child_email, "type": schedule_type})
+    
+    return jsonify({"ok": True, "schedules": schedules})
+
+# =========================
+# Policy Evaluation (Extension calls this)
+# =========================
+
+@app.route("/gprotect/policy", methods=["POST"])
+def gprotect_policy():
+    """Get GProtect policy for a child (called by extension)"""
+    body = request.json or {}
+    child_email = (body.get("student") or body.get("email") or "").strip().lower()
+    
+    if not child_email:
+        return jsonify({"ok": True, "active": False})
+    
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    # Check if child is registered
+    if child_email not in d["gprotect"]["children"]:
+        return jsonify({"ok": True, "active": False})
+    
+    parent_email = d["gprotect"]["children"][child_email]
+    schedules = d["gprotect"]["schedules"].get(child_email, {})
+    ai_categories = d["gprotect"]["ai_categories"].get(child_email, {})
+    manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
+    manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
+    
+    now = datetime.now()
+    current_time = now.time()
+    current_day = now.weekday()  # 0=Monday, 6=Sunday
+    
+    # Determine active mode
+    active_mode = "normal"
+    block_all = False
+    
+    # Check downtime (highest priority)
+    downtime = schedules.get("downtime", {})
+    if downtime.get("enabled"):
+        start = datetime.strptime(downtime.get("start", "21:00"), "%H:%M").time()
+        end = datetime.strptime(downtime.get("end", "07:00"), "%H:%M").time()
+        
+        if start > end:  # Crosses midnight
+            if current_time >= start or current_time < end:
+                active_mode = "downtime"
+                block_all = True
+        else:
+            if start <= current_time < end:
+                active_mode = "downtime"
+                block_all = True
+    
+    # Check school hours
+    if active_mode == "normal":
+        school_hours = schedules.get("school_hours", {})
+        if school_hours.get("enabled") and current_day in school_hours.get("days", []):
+            start = datetime.strptime(school_hours.get("start", "08:00"), "%H:%M").time()
+            end = datetime.strptime(school_hours.get("end", "15:00"), "%H:%M").time()
+            
+            if start <= current_time < end:
+                active_mode = "school_hours"
+                if school_hours.get("block_all"):
+                    block_all = True
+    
+    # Check homework hours
+    if active_mode == "normal":
+        hw_hours = schedules.get("homework_hours", {})
+        if hw_hours.get("enabled") and current_day in hw_hours.get("days", []):
+            start = datetime.strptime(hw_hours.get("start", "15:30"), "%H:%M").time()
+            end = datetime.strptime(hw_hours.get("end", "18:00"), "%H:%M").time()
+            
+            if start <= current_time < end:
+                active_mode = "homework_hours"
+    
+    # Check screen time
+    screen_time = schedules.get("screen_time", {})
+    screen_time_exceeded = False
+    if screen_time.get("enabled"):
+        # Simple daily limit check (you'd track usage in real implementation)
+        daily_limit = screen_time.get("daily_minutes", 120)
+        # TODO: Track actual usage and compare
+    
+    response = {
+        "ok": True,
+        "active": True,
+        "parent_email": parent_email,
+        "child_email": child_email,
+        "active_mode": active_mode,
+        "block_all": block_all,
+        "ai_categories": ai_categories,
+        "manual_blocks": manual_blocks,
+        "manual_allows": manual_allows,
+        "schedules": schedules,
+        "screen_time_exceeded": screen_time_exceeded,
+        "ts": int(time.time())
+    }
+    
+    return jsonify(response)
+
+# =========================
+# MDM Token Management (iOS)
+# =========================
+
+@app.route("/gprotect/mdm/register", methods=["POST"])
+def gprotect_mdm_register():
+    """Register iOS device for MDM"""
+    body = request.json or {}
+    child_email = (body.get("email") or "").strip().lower()
+    device_token = body.get("device_token")
+    device_info = body.get("device_info", {})
+    
+    if not child_email or not device_token:
+        return jsonify({"ok": False, "error": "Missing data"}), 400
+    
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    if child_email not in d["gprotect"]["children"]:
+        return jsonify({"ok": False, "error": "Not registered"}), 403
+    
+    d["gprotect"]["mdm_tokens"][child_email] = {
+        "device_token": device_token,
+        "device_info": device_info,
+        "registered_at": int(time.time())
+    }
+    
+    save_data(d)
+    log_action({"event": "gprotect_mdm_register", "child": child_email})
+    
+    return jsonify({"ok": True})
+
+@app.route("/gprotect/mdm/config/<child_email>", methods=["GET"])
+def gprotect_mdm_config(child_email):
+    """Get MDM configuration for device"""
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    if child_email not in d["gprotect"]["children"]:
+        return jsonify({"ok": False, "error": "Not registered"}), 403
+    
+    schedules = d["gprotect"]["schedules"].get(child_email, {})
+    
+    # Build MDM restrictions
+    restrictions = {
+        "block_all_apps": False,
+        "allowed_apps": [],
+        "blocked_apps": [],
+        "web_filter": {
+            "enabled": True,
+            "allowed_urls": d["gprotect"]["manual_allows"].get(child_email, []),
+            "blocked_urls": d["gprotect"]["manual_blocks"].get(child_email, [])
+        }
+    }
+    
+    # Check if currently in downtime
+    now = datetime.now()
+    current_time = now.time()
+    
+    downtime = schedules.get("downtime", {})
+    if downtime.get("enabled"):
+        start = datetime.strptime(downtime.get("start", "21:00"), "%H:%M").time()
+        end = datetime.strptime(downtime.get("end", "07:00"), "%H:%M").time()
+        
+        if start > end:
+            if current_time >= start or current_time < end:
+                restrictions["block_all_apps"] = True
+        else:
+            if start <= current_time < end:
+                restrictions["block_all_apps"] = True
+    
+    return jsonify({
+        "ok": True,
+        "restrictions": restrictions,
+        "schedules": schedules
+    })
+
+# =========================
+# Activity Logs
+# =========================
+
+@app.route("/gprotect/logs/<child_email>", methods=["GET"])
+@parent_required
+def gprotect_logs(child_email):
+    """Get activity logs for a child"""
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    parent_email = request.parent_email
+    
+    parent = d["gprotect"]["parents"].get(parent_email, {})
+    if child_email not in parent.get("children", []):
+        return jsonify({"ok": False, "error": "Not your child"}), 403
+    
+    logs = [log for log in d["gprotect"]["logs"] if log.get("child") == child_email]
+    logs.sort(key=lambda x: x.get("ts", 0), reverse=True)
+    
+    return jsonify({"ok": True, "logs": logs[:500]})
+
+@app.route("/gprotect/log", methods=["POST"])
+def gprotect_log_event():
+    """Log an event (called by extension/MDM)"""
+    body = request.json or {}
+    child_email = (body.get("child") or body.get("email") or "").strip().lower()
+    event_type = body.get("type")
+    url = body.get("url", "")
+    data = body.get("data", {})
+    
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    logs = d["gprotect"]["logs"]
+    logs.append({
+        "ts": int(time.time()),
+        "child": child_email,
+        "type": event_type,
+        "url": url,
+        "data": data
+    })
+    
+    d["gprotect"]["logs"] = logs[-5000:]
+    save_data(d)
+    
+    return jsonify({"ok": True})
+
+# =========================
+# Parent Dashboard Page
+# =========================
+
+@app.route("/gprotect")
+def gprotect_dashboard():
+    """Parent dashboard page"""
+    return render_template("gprotect_dashboard.html")
+
+@app.route("/gprotect/login")
+def gprotect_login_page():
+    """Parent login page"""
+    return render_template("gprotect_login.html")
 
 # =========================
 # Scenes Helpers
