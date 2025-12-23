@@ -1327,11 +1327,6 @@ def generate_mdm_profile(child_email):
         "PayloadDescription": "This profile enforces parental controls on this device. It cannot be removed without parent permission.",
         "PayloadRemovalPassword": "PARENT-SET-PASSWORD"
     }
- profile['PayloadContent'][0].update({
-    "FilterBrowsers": True,   # Enables filtering in Safari and other browsers
-    "FilterSockets": False,   # Optional
-    "FilterPackets": False    # Optional
-})
 
     plist_data = plistlib.dumps(profile)
 
@@ -1348,103 +1343,111 @@ def generate_mdm_profile(child_email):
     daily_limit_minutes = screen_time.get("daily_minutes", 120)
     
     # Build the plist structure
-    profile = {
-        "PayloadContent": [
-            # Web Content Filter
-            {
-                "PayloadType": "com.apple.webcontent-filter",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.webfilter.{child_email}",
-                "PayloadUUID": str(uuid.uuid4()).upper(),
-                "PayloadDisplayName": "GProtect Web Filter",
-                "FilterType": "Plugin",
-                "ServerAddress": "https://gschool.gdistrict.org",
-                "FilterSockets": True,
-                "VendorConfig": {
-                    "child_email": child_email,
-                    "manual_blocks": manual_blocks,
-                    "manual_allows": manual_allows,
-                    "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
+  profile = {
+    "PayloadContent": [
+        # Web Content Filter
+        {
+            "PayloadType": "com.apple.webcontent-filter",
+            "PayloadVersion": 1,
+            "PayloadIdentifier": f"org.gdistrict.gprotect.webfilter.{child_email}",
+            "PayloadUUID": str(uuid.uuid4()).upper(),
+            "PayloadDisplayName": "GProtect Web Filter",
+            "FilterType": "Plugin",
+            "ServerAddress": "https://gschool.gdistrict.org",
+            "FilterSockets": True,
+            "VendorConfig": {
+                "child_email": child_email,
+                "manual_blocks": manual_blocks,
+                "manual_allows": manual_allows,
+                "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
+            }
+        },
+
+        # Restrictions
+        {
+            "PayloadType": "com.apple.applicationaccess",
+            "PayloadVersion": 1,
+            "PayloadIdentifier": f"org.gdistrict.gprotect.restrictions.{child_email}",
+            "PayloadUUID": str(uuid.uuid4()).upper(),
+            "PayloadDisplayName": "GProtect Restrictions",
+
+            "blacklistedAppBundleIDs": blocked_apps,
+            "allowSafari": True,
+            "safariAllowAutoFill": False,
+            "safariAllowJavaScript": True,
+            "safariAllowPopups": False,
+            "safariForceFraudWarning": True,
+            "allowExplicitContent": False,
+            "allowGameCenter": False,
+            "allowAddingGameCenterFriends": False,
+            "allowMultiplayerGaming": False,
+        },
+
+        # Screen Time
+        {
+            "PayloadType": "com.apple.screentime",
+            "PayloadVersion": 1,
+            "PayloadIdentifier": f"org.gdistrict.gprotect.screentime.{child_email}",
+            "PayloadUUID": str(uuid.uuid4()).upper(),
+            "PayloadDisplayName": "GProtect Screen Time",
+
+            "familyControlsEnabled": True,
+            "downtimeSchedule": {
+                "enabled": downtime_enabled,
+                "start": {
+                    "hour": int(downtime_start[0]),
+                    "minute": int(downtime_start[1])
+                },
+                "end": {
+                    "hour": int(downtime_end[0]),
+                    "minute": int(downtime_end[1])
                 }
             },
-            
-            # Restrictions
-            {
-                "PayloadType": "com.apple.applicationaccess",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.restrictions.{child_email}",
-                "PayloadUUID": str(uuid.uuid4()).upper(),
-                "PayloadDisplayName": "GProtect Restrictions",
-                
-                "blacklistedAppBundleIDs": blocked_apps,
-                "allowSafari": True,
-                "safariAllowAutoFill": False,
-                "safariAllowJavaScript": True,
-                "safariAllowPopups": False,
-                "safariForceFraudWarning": True,
-                "allowExplicitContent": False,
-                "allowGameCenter": False,
-                "allowAddingGameCenterFriends": False,
-                "allowMultiplayerGaming": False,
+            "appLimits": {
+                "application": {
+                    "com.apple.mobilesafari": {
+                        "timeLimit": daily_limit_minutes * 60
+                    }
+                }
             },
-            
-            # Screen Time
-            {
-                "PayloadType": "com.apple.screentime",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.screentime.{child_email}",
-                "PayloadUUID": str(uuid.uuid4()).upper(),
-                "PayloadDisplayName": "GProtect Screen Time",
-                
-                "familyControlsEnabled": True,
-                "downtimeSchedule": {
-                    "enabled": downtime_enabled,
-                    "start": {
-                        "hour": int(downtime_start[0]),
-                        "minute": int(downtime_start[1])
-                    },
-                    "end": {
-                        "hour": int(downtime_end[0]),
-                        "minute": int(downtime_end[1])
-                    }
-                },
-                "appLimits": {
-                    "application": {
-                        "com.apple.mobilesafari": {
-                            "timeLimit": daily_limit_minutes * 60
-                        }
-                    }
-                },
-                "alwaysAllowedBundleIDs": [
-                    "com.apple.mobilephone",
-                    "com.apple.FaceTime",
-                    "com.apple.MobileSMS"
-                ]
-            }
-        ],
-        
-        # Root payload settings
-        "PayloadDisplayName": f"GProtect Controls - {child_email}",
-        "PayloadIdentifier": f"org.gdistrict.gprotect.{child_email}",
-        "PayloadRemovalDisallowed": True,
-        "PayloadType": "Configuration",
-        "PayloadUUID": str(uuid.uuid4()).upper(),
-        "PayloadVersion": 1,
-        "PayloadOrganization": "GProtect",
-        "PayloadDescription": "Parental controls managed by GProtect system"
-    }
-    
-    # Convert to plist XML
-    plist_data = plistlib.dumps(profile)
-    
-    # Return as downloadable file
-    return Response(
-        plist_data,
-        mimetype='application/x-apple-aspen-config',
-        headers={
-            'Content-Disposition': f'attachment; filename=GProtect_{child_email}.mobileconfig'
+            "alwaysAllowedBundleIDs": [
+                "com.apple.mobilephone",
+                "com.apple.FaceTime",
+                "com.apple.MobileSMS"
+            ]
         }
-    )
+    ],
+
+    # Root payload settings
+    "PayloadDisplayName": f"GProtect Controls - {child_email}",
+    "PayloadIdentifier": f"org.gdistrict.gprotect.{child_email}",
+    "PayloadRemovalDisallowed": True,
+    "PayloadType": "Configuration",
+    "PayloadUUID": str(uuid.uuid4()).upper(),
+    "PayloadVersion": 1,
+    "PayloadOrganization": "GProtect",
+    "PayloadDescription": "Parental controls managed by GProtect system"
+}
+
+# Fix Apple content filter requirement
+profile['PayloadContent'][0].update({
+    "FilterBrowsers": True,
+    "FilterSockets": False,
+    "FilterPackets": False
+})
+
+# Convert to plist XML
+plist_data = plistlib.dumps(profile)
+
+# Return as downloadable file
+return Response(
+    plist_data,
+    mimetype='application/x-apple-aspen-config',
+    headers={
+        'Content-Disposition': f'attachment; filename=GProtect_{child_email}.mobileconfig'
+    }
+)
+
 
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
 def update_mdm_profile(child_email):
