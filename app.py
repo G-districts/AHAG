@@ -28,7 +28,7 @@ from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
 
-APNS_CERT = "certs/mdm_push.pem"
+APNS_CERT = "mdm_push.pem"  # now in root
 APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
 
 apns_client = APNsClient(
