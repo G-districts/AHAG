@@ -1,8 +1,18 @@
-# =========================
-# G-SCHOOLS CONNECT BACKEND
-# =========================
 import sys
 import collections
+
+# =========================
+# Patch for hyper/apns2 compatibility on Python >= 3.3
+# =========================
+if sys.version_info >= (3, 3):
+    import collections.abc
+    collections.Iterable = collections.abc.Iterable
+    collections.Mapping = collections.abc.Mapping
+    collections.MutableSet = collections.abc.MutableSet
+
+# =========================
+# Imports
+# =========================
 from flask import Flask, request, jsonify, render_template, session, redirect, Response, url_for
 from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
@@ -16,10 +26,6 @@ from functools import wraps
 import plistlib
 import uuid
 from apns_mdm import send_mdm_push
-
-if sys.version_info >= (3, 13):
-    collections.Iterable = collections.abc.Iterable
-    collections.Mapping = collections.abc.Mapping
 
 from apns2.client import APNsClient
 from apns2.payload import Payload
