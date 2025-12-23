@@ -1,6 +1,7 @@
 import sys
 import collections
 from OpenSSL import crypto
+import base64
 
 # =========================
 # Patch collections for hyper/apns2 compatibility
