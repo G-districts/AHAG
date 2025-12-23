@@ -1421,7 +1421,7 @@ def generate_mdm_profile(child_email):
     # Example dynamically generated lists
     blacklisted_apps = ["com.instagram.ios", "com.snapchat.snapchat"]
     whitelisted_apps = ["com.apple.mobilesafari", "com.apple.mobilemail"]
-    
+
     # --------------------------
     # Build payloads
     # --------------------------
@@ -1431,7 +1431,8 @@ def generate_mdm_profile(child_email):
         "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
         "PayloadUUID": new_uuid(),
         "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
-        "PayloadContent": IDENTITY_P12_B64,
+        # Must be bytes for plistlib to generate <data>
+        "PayloadContent": IDENTITY_P12_B64.encode("utf-8"),
     }
 
     web_filter_payload = {
@@ -1471,7 +1472,7 @@ def generate_mdm_profile(child_email):
         "allowMultiplayerGaming": False,
         "forceEncryptedBackup": True,
         "allowDiagnosticSubmission": False,
-        "allowScreenTime": True,  # Only needed for downtime to work
+        # Downtime
         "downtimeSchedule": {
             "enabled": True,
             "start": {"hour": 21, "minute": 0},
