@@ -67,7 +67,273 @@ DATA_PATH = os.path.join(ROOT, "data.json")
 DB_PATH = os.path.join(ROOT, "gschool.db")
 SCENES_PATH = os.path.join(ROOT, "scenes.json")
 
+# =========================
+# Helpers: Data & Database
+# =========================
+def _clean_expired_bypass_codes(settings):
+    now = time.time()
+    settings["bypass_codes"] = [
+        c for c in settings.get("bypass_codes", []) if c["expires"] > now
+    ]
 
+def _hash_code(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+def _clean_expired_bypass_codes(settings: dict):
+    now = time.time()
+    codes = settings.get("bypass_codes", [])
+    settings["bypass_codes"] = [
+        c for c in codes
+        if c.get("expires", 0) > now
+    ]
+
+def db():
+    """Open sqlite connection (row factory stays default to keep light)."""
+    con = sqlite3.connect(DB_PATH)
+    return con
+
+def _init_db():
+    """Create tables if missing; repair structure when possible."""
+    con = db()
+    cur = con.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            k TEXT PRIMARY KEY,
+            v TEXT
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            email TEXT PRIMARY KEY,
+            password TEXT,
+            role TEXT
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room TEXT,
+            user_id TEXT,
+            role TEXT,
+            text TEXT,
+            ts INTEGER
+        );
+    """)
+    con.commit()
+    con.close()
+
+_init_db()
+
+def _safe_default_data():
+    return {
+        "settings": {"chat_enabled": False},
+        "classes": {
+            "period1": {
+                "name": "Period 1",
+                "active": False,
+                "focus_mode": False,
+                "paused": False,
+                "allowlist": [],
+                "teacher_blocks": [],
+                "students": [],
+                "owner": None,
+                "schedule": {}
+            }
+        },
+        "categories": {},
+        "pending_commands": {},
+        "pending_per_student": {},
+        "presence": {},
+        "history": {},
+        "screenshots": {},
+        "dm": {},
+        "alerts": [],
+        "audit": []
+    }
+
+def _coerce_to_dict(obj):
+    """If file accidentally became a list or invalid type, coerce to default dict."""
+    if isinstance(obj, dict):
+        return obj
+    # Attempt to stitch a list of dict fragments
+    if isinstance(obj, list):
+        d = _safe_default_data()
+        for item in obj:
+            if isinstance(item, dict):
+                d.update(item)
+        return d
+    return _safe_default_data()
+
+def load_data():
+    """Load JSON with self-repair for common corruption patterns."""
+    if not os.path.exists(DATA_PATH):
+        d = _safe_default_data()
+        save_data(d)
+        return d
+    try:
+        with open(DATA_PATH, "r", encoding="utf-8") as f:
+            obj = json.load(f)
+            return ensure_keys(_coerce_to_dict(obj))
+    except json.JSONDecodeError as e:
+        # Try simple auto-repair: merge stray blocks like "} {"
+        try:
+            text = open(DATA_PATH, "r", encoding="utf-8").read().strip()
+            # Fix common '}{' issues
+            text = re.sub(r"}\s*{", "},{", text)
+            if not text.startswith("["):
+                text = "[" + text
+            if not text.endswith("]"):
+                text = text + "]"
+            arr = json.loads(text)
+            obj = _coerce_to_dict(arr)
+            save_data(obj)
+            return ensure_keys(obj)
+        except Exception:
+            print("[FATAL] data.json unrecoverable; starting fresh:", e)
+            obj = _safe_default_data()
+            save_data(obj)
+            return obj
+    except Exception as e:
+        print("[WARN] load_data failed; using defaults:", e)
+        return ensure_keys(_safe_default_data())
+
+def save_data(d):
+    d = ensure_keys(_coerce_to_dict(d))
+    with open(DATA_PATH, "w", encoding="utf-8") as f:
+        json.dump(d, f, indent=2)
+
+def get_setting(key, default=None):
+    con = db(); cur = con.cursor()
+    cur.execute("SELECT v FROM settings WHERE k=?", (key,))
+    row = cur.fetchone()
+    con.close()
+    if not row:
+        return default
+    try:
+        return json.loads(row[0])
+    except Exception:
+        return row[0]
+
+def set_setting(key, value):
+    con = db(); cur = con.cursor()
+    cur.execute("REPLACE INTO settings (k, v) VALUES (?,?)", (key, json.dumps(value)))
+    con.commit(); con.close()
+
+def current_user():
+    return session.get("user")
+
+
+def ensure_keys(d):
+    d.setdefault("settings", {}).setdefault("chat_enabled", False)
+
+    # Ensure classes dict exists and normalize all class sessions.
+    classes = d.setdefault("classes", {})
+    classes.setdefault(
+        "period1",
+        {
+            "name": "Period 1",
+            "active": False,
+            "focus_mode": False,
+            "paused": False,
+            "allowlist": [],
+            "teacher_blocks": [],
+            "students": [],
+            "owner": None,
+            "schedule": {},
+        },
+    )
+
+    # Normalize every class object and student email list.
+    for cid, cls in list(classes.items()):
+        if not isinstance(cls, dict):
+            classes[cid] = {
+                "name": str(cls),
+                "active": False,
+                "focus_mode": False,
+                "paused": False,
+                "allowlist": [],
+                "teacher_blocks": [],
+                "students": [],
+                "owner": None,
+                "schedule": {},
+            }
+            cls = classes[cid]
+
+        cls.setdefault("name", cid)
+        cls.setdefault("active", False)
+        cls.setdefault("focus_mode", False)
+        cls.setdefault("paused", False)
+        cls.setdefault("allowlist", [])
+        cls.setdefault("teacher_blocks", [])
+        cls.setdefault("students", [])
+        cls.setdefault("owner", None)
+        cls.setdefault("schedule", {})
+
+        # Normalize student email list for this class (strip + lowercase).
+        norm_students = []
+        for s in cls.get("students") or []:
+            if not s:
+                continue
+            s_norm = str(s).strip().lower()
+            if s_norm and "@" in s_norm:
+                norm_students.append(s_norm)
+        cls["students"] = norm_students
+
+    # Core collections
+    d.setdefault("categories", {})
+    d.setdefault("pending_commands", {})
+    d.setdefault("pending_per_student", {})
+    d.setdefault("student_scenes", {})
+    d.setdefault("class_scenes", {})
+    d.setdefault("presence", {})
+    d.setdefault("history", {})
+    d.setdefault("screenshots", {})
+    d.setdefault("alerts", [])
+    d.setdefault("dm", {})
+    d.setdefault("audit", [])
+
+    # Policy system
+    #   policies:           id -> policy object
+    #   policy_assignments: { "users": {email: policy_id}, "groups": {group: policy_id} }
+    #   default_policy_id:  policy to use when user has no explicit group/user policy
+    d.setdefault("policies", {})
+    d.setdefault("policy_assignments", {}).setdefault("users", {})
+    d.setdefault("policy_assignments", {}).setdefault("groups", {})
+    d.setdefault("default_policy_id", None)
+
+    # Feature flags
+    d.setdefault("extension_enabled", True)
+    return d
+
+def log_action(entry):
+    try:
+        d = ensure_keys(load_data())
+        log = d.setdefault("audit", [])
+        entry = dict(entry or {})
+        entry["ts"] = int(time.time())
+        log.append(entry)
+        d["audit"] = log[-500:]
+        save_data(d)
+    except Exception:
+        pass
+
+
+# =========================
+# Guest handling helper
+# =========================
+_GUEST_TOKENS = ("guest", "anon", "anonymous", "trial", "temp")
+
+def _is_guest_identity(email: str, name: str) -> bool:
+    """Heuristic: treat empty email or names/emails containing guest-like tokens as guest."""
+    e = (email or "").strip().lower()
+    n = (name or "").strip().lower()
+    if not e:
+        return True
+    if any(t in e for t in _GUEST_TOKENS):
+        return True
+    if any(t in n for t in _GUEST_TOKENS):
+        return True
+    return False
 
 #=========================
 # Parental control
