@@ -2,9 +2,8 @@ import sys
 import collections
 
 # =========================
-# Patch for hyper/apns2 compatibility on Python >= 3.3
+# Patch collections for hyper/apns2 compatibility
 # =========================
-
 if sys.version_info >= (3, 3):
     import collections.abc
     collections.Iterable = collections.abc.Iterable
@@ -12,9 +11,7 @@ if sys.version_info >= (3, 3):
     collections.MutableSet = collections.abc.MutableSet
     collections.MutableMapping = collections.abc.MutableMapping
 
-# =========================
-# Imports
-# =========================
+# Now import everything else
 from flask import Flask, request, jsonify, render_template, session, redirect, Response, url_for
 from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
@@ -26,7 +23,6 @@ from image_filter_ai import classify_image as _gschool_classify_image
 import jwt
 from functools import wraps
 import plistlib
-import uuid
 from apns_mdm import send_mdm_push
 
 from apns2.client import APNsClient
