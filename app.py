@@ -30,6 +30,7 @@ from apns2.payload import Payload
 
 APNS_CERT = "mdm_push.pem"  # now in root
 APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
+APNS_CERT_UUID = "9507ef8f-dcbb-483e-89db-298d5471c6c1"  # match your APNS_TOPIC suffix
 
 apns_client = APNsClient(
     APNS_CERT,
