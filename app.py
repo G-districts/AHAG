@@ -67,320 +67,76 @@ DATA_PATH = os.path.join(ROOT, "data.json")
 DB_PATH = os.path.join(ROOT, "gschool.db")
 SCENES_PATH = os.path.join(ROOT, "scenes.json")
 
-# ===============================
-# Load PEM from file
-# ===============================
-APNS_PEM_PATH = "student_cert.pem"  # your PEM file path
-
-with open(APNS_PEM_PATH, "rb") as f:
-    pem_bytes = f.read()
-
-# ===============================
-# Extract certificate only for x509
-# ===============================
-cert_pem = b"-----BEGIN CERTIFICATE-----" + \
-           pem_bytes.split(b"-----BEGIN CERTIFICATE-----")[1].split(b"-----END CERTIFICATE-----")[0] + \
-           b"-----END CERTIFICATE-----\n"
-
-# Load certificate
-cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
-
-# Extract CN and generate deterministic UUID
-cn = cert_obj.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
-identity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, cn)).upper()
-
-# Base64 encode full PEM for IdentityCertificate payload
-identity_b64 = base64.b64encode(pem_bytes).decode("ascii")
-
-# ===============================
-# IdentityCertificate payload
-# ===============================
-identity_payload = {
-    "PayloadType": "com.apple.security.pem",
-    "PayloadVersion": 1,
-    "PayloadIdentifier": "org.gdistrict.gprotect.identity",
-    "PayloadUUID": str(uuid.uuid4()).upper(),
-    "PayloadDisplayName": "GProtect Student Identity",
-    "PayloadContent": identity_b64,
-}
-
-# ===============================
-# MDM payload
-# ===============================
 
 
-
-# =========================
-# Helpers: Data & Database
-# =========================
-def _clean_expired_bypass_codes(settings):
-    now = time.time()
-    settings["bypass_codes"] = [
-        c for c in settings.get("bypass_codes", []) if c["expires"] > now
-    ]
-
-def _hash_code(code: str) -> str:
-    return hashlib.sha256(code.encode()).hexdigest()
-
-def _clean_expired_bypass_codes(settings: dict):
-    now = time.time()
-    codes = settings.get("bypass_codes", [])
-    settings["bypass_codes"] = [
-        c for c in codes
-        if c.get("expires", 0) > now
-    ]
-
-def db():
-    """Open sqlite connection (row factory stays default to keep light)."""
-    con = sqlite3.connect(DB_PATH)
-    return con
-
-def _init_db():
-    """Create tables if missing; repair structure when possible."""
-    con = db()
-    cur = con.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS settings (
-            k TEXT PRIMARY KEY,
-            v TEXT
-        );
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            email TEXT PRIMARY KEY,
-            password TEXT,
-            role TEXT
-        );
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            room TEXT,
-            user_id TEXT,
-            role TEXT,
-            text TEXT,
-            ts INTEGER
-        );
-    """)
-    con.commit()
-    con.close()
-
-_init_db()
-
-def _safe_default_data():
-    return {
-        "settings": {"chat_enabled": False},
-        "classes": {
-            "period1": {
-                "name": "Period 1",
-                "active": False,
-                "focus_mode": False,
-                "paused": False,
-                "allowlist": [],
-                "teacher_blocks": [],
-                "students": [],
-                "owner": None,
-                "schedule": {}
-            }
-        },
-        "categories": {},
-        "pending_commands": {},
-        "pending_per_student": {},
-        "presence": {},
-        "history": {},
-        "screenshots": {},
-        "dm": {},
-        "alerts": [],
-        "audit": []
-    }
-
-def _coerce_to_dict(obj):
-    """If file accidentally became a list or invalid type, coerce to default dict."""
-    if isinstance(obj, dict):
-        return obj
-    # Attempt to stitch a list of dict fragments
-    if isinstance(obj, list):
-        d = _safe_default_data()
-        for item in obj:
-            if isinstance(item, dict):
-                d.update(item)
-        return d
-    return _safe_default_data()
-
-def load_data():
-    """Load JSON with self-repair for common corruption patterns."""
-    if not os.path.exists(DATA_PATH):
-        d = _safe_default_data()
-        save_data(d)
-        return d
-    try:
-        with open(DATA_PATH, "r", encoding="utf-8") as f:
-            obj = json.load(f)
-            return ensure_keys(_coerce_to_dict(obj))
-    except json.JSONDecodeError as e:
-        # Try simple auto-repair: merge stray blocks like "} {"
-        try:
-            text = open(DATA_PATH, "r", encoding="utf-8").read().strip()
-            # Fix common '}{' issues
-            text = re.sub(r"}\s*{", "},{", text)
-            if not text.startswith("["):
-                text = "[" + text
-            if not text.endswith("]"):
-                text = text + "]"
-            arr = json.loads(text)
-            obj = _coerce_to_dict(arr)
-            save_data(obj)
-            return ensure_keys(obj)
-        except Exception:
-            print("[FATAL] data.json unrecoverable; starting fresh:", e)
-            obj = _safe_default_data()
-            save_data(obj)
-            return obj
-    except Exception as e:
-        print("[WARN] load_data failed; using defaults:", e)
-        return ensure_keys(_safe_default_data())
-
-def save_data(d):
-    d = ensure_keys(_coerce_to_dict(d))
-    with open(DATA_PATH, "w", encoding="utf-8") as f:
-        json.dump(d, f, indent=2)
-
-def get_setting(key, default=None):
-    con = db(); cur = con.cursor()
-    cur.execute("SELECT v FROM settings WHERE k=?", (key,))
-    row = cur.fetchone()
-    con.close()
-    if not row:
-        return default
-    try:
-        return json.loads(row[0])
-    except Exception:
-        return row[0]
-
-def set_setting(key, value):
-    con = db(); cur = con.cursor()
-    cur.execute("REPLACE INTO settings (k, v) VALUES (?,?)", (key, json.dumps(value)))
-    con.commit(); con.close()
-
-def current_user():
-    return session.get("user")
-
-
-def ensure_keys(d):
-    d.setdefault("settings", {}).setdefault("chat_enabled", False)
-
-    # Ensure classes dict exists and normalize all class sessions.
-    classes = d.setdefault("classes", {})
-    classes.setdefault(
-        "period1",
-        {
-            "name": "Period 1",
-            "active": False,
-            "focus_mode": False,
-            "paused": False,
-            "allowlist": [],
-            "teacher_blocks": [],
-            "students": [],
-            "owner": None,
-            "schedule": {},
-        },
-    )
-
-    # Normalize every class object and student email list.
-    for cid, cls in list(classes.items()):
-        if not isinstance(cls, dict):
-            classes[cid] = {
-                "name": str(cls),
-                "active": False,
-                "focus_mode": False,
-                "paused": False,
-                "allowlist": [],
-                "teacher_blocks": [],
-                "students": [],
-                "owner": None,
-                "schedule": {},
-            }
-            cls = classes[cid]
-
-        cls.setdefault("name", cid)
-        cls.setdefault("active", False)
-        cls.setdefault("focus_mode", False)
-        cls.setdefault("paused", False)
-        cls.setdefault("allowlist", [])
-        cls.setdefault("teacher_blocks", [])
-        cls.setdefault("students", [])
-        cls.setdefault("owner", None)
-        cls.setdefault("schedule", {})
-
-        # Normalize student email list for this class (strip + lowercase).
-        norm_students = []
-        for s in cls.get("students") or []:
-            if not s:
-                continue
-            s_norm = str(s).strip().lower()
-            if s_norm and "@" in s_norm:
-                norm_students.append(s_norm)
-        cls["students"] = norm_students
-
-    # Core collections
-    d.setdefault("categories", {})
-    d.setdefault("pending_commands", {})
-    d.setdefault("pending_per_student", {})
-    d.setdefault("student_scenes", {})
-    d.setdefault("class_scenes", {})
-    d.setdefault("presence", {})
-    d.setdefault("history", {})
-    d.setdefault("screenshots", {})
-    d.setdefault("alerts", [])
-    d.setdefault("dm", {})
-    d.setdefault("audit", [])
-
-    # Policy system
-    #   policies:           id -> policy object
-    #   policy_assignments: { "users": {email: policy_id}, "groups": {group: policy_id} }
-    #   default_policy_id:  policy to use when user has no explicit group/user policy
-    d.setdefault("policies", {})
-    d.setdefault("policy_assignments", {}).setdefault("users", {})
-    d.setdefault("policy_assignments", {}).setdefault("groups", {})
-    d.setdefault("default_policy_id", None)
-
-    # Feature flags
-    d.setdefault("extension_enabled", True)
-    return d
-
-def log_action(entry):
-    try:
-        d = ensure_keys(load_data())
-        log = d.setdefault("audit", [])
-        entry = dict(entry or {})
-        entry["ts"] = int(time.time())
-        log.append(entry)
-        d["audit"] = log[-500:]
-        save_data(d)
-    except Exception:
-        pass
-
-
-# =========================
-# Guest handling helper
-# =========================
-_GUEST_TOKENS = ("guest", "anon", "anonymous", "trial", "temp")
-
-def _is_guest_identity(email: str, name: str) -> bool:
-    """Heuristic: treat empty email or names/emails containing guest-like tokens as guest."""
-    e = (email or "").strip().lower()
-    n = (name or "").strip().lower()
-    if not e:
-        return True
-    if any(t in e for t in _GUEST_TOKENS):
-        return True
-    if any(t in n for t in _GUEST_TOKENS):
-        return True
-    return False
 #=========================
 # Parental control
 #=========================
+# --------------------------
+# Identity certificate config
+# --------------------------
+# Replace with your Base64 .p12 content
+IDENTITY_P12_B64 = """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"""  
 
+# Removal password (optional)
+REMOVAL_PASSWORD = "220099"
 
 # =========================
 # GPROTECT - PARENT CONTROLS
@@ -1389,153 +1145,112 @@ def mdm_checkin():
         print("MDM checkin error:", e)
         return Response(plistlib.dumps({}), mimetype="application/xml")
 
-@app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
+@app.route("/gprotect/mdm/profile/<child_email>")
 def generate_mdm_profile(child_email):
-
-    # Mock data (replace later)
-    d = {"gprotect": {"children": [child_email], "schedules": {}, "manual_blocks": {}, "manual_allows": {}}}
-
-    if child_email not in d["gprotect"]["children"]:
-        return jsonify({"ok": False, "error": "Not registered"}), 403
-
-    child_name = child_email.split("@")[0].capitalize()
-
     def new_uuid():
         return str(uuid.uuid4()).upper()
 
-    PROFILE_UUID = new_uuid()
-    IDENTITY_CERT_UUID = new_uuid()
-    MDM_PAYLOAD_UUID = new_uuid()
+    child_name = child_email.split("@")[0].capitalize()
 
-    # ----------------------
-    # Apps
-    # ----------------------
-    always_allowed = [
-        "com.apple.mobilephone",
-        "com.apple.FaceTime",
-        "com.apple.MobileSMS"
-    ]
-
-    downtime_apps = [
-        "com.instagram.ios",
-        "com.snapchat.snapchat",
-        "com.tiktok.tiktokv",
-        "com.facebook.Facebook",
-        "com.twitter.twitter",
-        "com.apple.mobilesafari",
-    ]
-
-    manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
-    manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
-    all_blocked_apps = set(downtime_apps + manual_blocks)
-
-    # ----------------------
-    # WebClips
-    # ----------------------
-    webclips = []
-    for app_bundle in all_blocked_apps:
-        if app_bundle in always_allowed:
-            continue
-
-        display_name = f"{app_bundle} (Blocked)"
-        webclips.append({
-            "PayloadType": "com.apple.webClip.managed",
-            "PayloadVersion": 1,
-            "PayloadIdentifier": f"org.gdistrict.gprotect.webclip.{child_email}.{app_bundle}",
-            "PayloadUUID": new_uuid(),
-            "PayloadDisplayName": display_name,
-            "Label": display_name,
-            "PayloadDescription": f"Overlay for {display_name}",
-            "IsRemovable": False,
-            "Precomposed": True,
-            "URL": f"https://blocked.gdistrict.org/parent_block?website={app_bundle}"
-        })
-
-    # ===============================
-    # IDENTITY CERT PAYLOAD (PKCS#12)
-    # MUST BE FIRST
-    # ===============================
+    # Example dynamically generated lists
+    blacklisted_apps = ["com.instagram.ios", "com.snapchat.snapchat"]
+    whitelisted_apps = ["com.apple.mobilesafari", "com.apple.mobilemail"]
+    
+    # --------------------------
+    # Build payloads
+    # --------------------------
     identity_payload = {
         "PayloadType": "com.apple.security.pkcs12",
         "PayloadVersion": 1,
         "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
-        "PayloadUUID": IDENTITY_CERT_UUID,
-        "PayloadDisplayName": "GProtect Student Identity",
-        "Password": IDENTITY_CERT_PASSWORD,   # "" if none
-        "PayloadContent": IDENTITY_P12_B64     # base64 ONLY
+        "PayloadUUID": new_uuid(),
+        "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
+        "PayloadContent": IDENTITY_P12_B64,
     }
 
-    # ===============================
-    # MDM PAYLOAD
-    # ===============================
-    mdm_payload = {
-        "PayloadType": "com.apple.mdm",
-        "PayloadVersion": 1,
-        "PayloadIdentifier": f"org.gdistrict.gprotect.mdm.{child_email}",
-        "PayloadUUID": MDM_PAYLOAD_UUID,
-        "PayloadDisplayName": f"GProtect MDM for {child_name}",
-        "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
-        "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
-        "AccessRights": 8191,
-        "IdentityCertificateUUID": IDENTITY_CERT_UUID,
-        "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",
-        "SignMessage": True
-    }
-
-    # ===============================
-    # WEB CONTENT FILTER
-    # ===============================
     web_filter_payload = {
         "PayloadType": "com.apple.webcontent-filter",
         "PayloadVersion": 1,
-        "PayloadIdentifier": f"org.gdistrict.gprotect.webfilter.{child_email}",
+        "PayloadIdentifier": "org.gdistrict.gprotect.webfilter",
         "PayloadUUID": new_uuid(),
-        "PayloadDisplayName": f"GProtect Web Filter for {child_name}",
+        "PayloadDisplayName": "GProtect Web Filter",
+        "PayloadDescription": "Content filtering controlled by parent",
         "FilterType": "Plugin",
         "UserDefinedName": "GProtect Filter",
         "PluginBundleID": "org.gdistrict.gprotect.filter",
         "ServerAddress": "https://gschool.gdistrict.org",
         "Organization": "GProtect",
-        "FilterBrowsers": True,
-        "FilterSockets": False,
-        "FilterPackets": False,
-        "VendorConfig": {
-            "child_email": child_email,
-            "manual_blocks": manual_blocks,
-            "manual_allows": manual_allows
-        }
+        "FilterDataProviderBundleIdentifier": "org.gdistrict.gprotect.dataprovider",
+        "FilterDataProviderDesignatedRequirement": 'identifier "org.gdistrict.gprotect.dataprovider"',
     }
 
-    # ===============================
-    # RESTRICTIONS
-    # ===============================
     restrictions_payload = {
         "PayloadType": "com.apple.applicationaccess",
         "PayloadVersion": 1,
-        "PayloadIdentifier": f"org.gdistrict.gprotect.restrictions.{child_email}",
+        "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
         "PayloadUUID": new_uuid(),
-        "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
-        "blacklistedAppBundleIDs": list(all_blocked_apps),
-        "whitelistedAppBundleIDs": always_allowed,
+        "PayloadDisplayName": "GProtect Restrictions",
+        "blacklistedAppBundleIDs": blacklisted_apps,
+        "whitelistedAppBundleIDs": whitelisted_apps,
         "allowSafari": True,
-        "allowScreenTime": False
+        "safariAllowAutoFill": False,
+        "safariAllowJavaScript": True,
+        "safariAllowPopups": False,
+        "safariForceFraudWarning": True,
+        "allowExplicitContent": False,
+        "allowBookstore": True,
+        "allowBookstoreErotica": False,
+        "allowGameCenter": False,
+        "allowAddingGameCenterFriends": False,
+        "allowMultiplayerGaming": False,
+        "forceEncryptedBackup": True,
+        "allowDiagnosticSubmission": False,
+        "allowScreenTime": True,  # Only needed for downtime to work
+        "downtimeSchedule": {
+            "enabled": True,
+            "start": {"hour": 21, "minute": 0},
+            "end": {"hour": 7, "minute": 0},
+        },
     }
 
-    # ===============================
-    # FULL PROFILE
-    # ===============================
+    vpn_payload = {
+        "PayloadType": "com.apple.vpn.managed",
+        "PayloadVersion": 1,
+        "PayloadIdentifier": "org.gdistrict.gprotect.vpn",
+        "PayloadUUID": new_uuid(),
+        "PayloadDisplayName": "GProtect Filter VPN",
+        "UserDefinedName": "GProtect Content Filter",
+        "VPNType": "IKEv2",
+        "IKEv2": {
+            "RemoteAddress": "vpn.gdistrict.org",
+            "RemoteIdentifier": "vpn.gdistrict.org",
+            "LocalIdentifier": "gprotect",
+            "AuthenticationMethod": "SharedSecret",
+            "SharedSecret": "BASE64-ENCODED-SECRET",
+            "ExtendedAuthEnabled": 1,
+            "AuthName": "gprotect",
+            "AuthPassword": "DEVICE-SPECIFIC-PASSWORD",
+        },
+        "OnDemandEnabled": 1,
+        "OnDemandRules": [{"Action": "Connect"}],
+    }
+
     profile = {
         "PayloadType": "Configuration",
         "PayloadVersion": 1,
-        "PayloadUUID": PROFILE_UUID,
+        "PayloadUUID": new_uuid(),
         "PayloadIdentifier": "org.gdistrict.gprotect",
-        "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
+        "PayloadDisplayName": "GProtect Parental Controls",
         "PayloadOrganization": "GProtect",
+        "PayloadDescription": "This profile enforces parental controls on this device. It cannot be removed without parent permission.",
         "PayloadRemovalDisallowed": True,
-        "PayloadContent": (
-            [identity_payload, mdm_payload, web_filter_payload, restrictions_payload]
-            + webclips
-        )
+        "PayloadRemovalPassword": REMOVAL_PASSWORD,
+        "PayloadContent": [
+            identity_payload,
+            web_filter_payload,
+            restrictions_payload,
+            vpn_payload
+        ]
     }
 
     plist_data = plistlib.dumps(profile)
@@ -1543,9 +1258,7 @@ def generate_mdm_profile(child_email):
     return Response(
         plist_data,
         mimetype="application/x-apple-aspen-config",
-        headers={
-            "Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"
-        }
+        headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
 
 
