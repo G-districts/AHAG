@@ -15,7 +15,7 @@ from functools import wraps
 import plistlib
 import uuid
 
-PNS_CERT_UUID = str(uuid.uuid4()).upper()  # Fake certificate UUID
+APNS_CERT_UUID = str(uuid.uuid4()).upper()  # Fake certificate UUID
 APNS_TOPIC = "gschool.gdistrict.org"       # Fake topic for testing
 # ---------------------------
 # Flask App Initialization
@@ -1362,7 +1362,7 @@ def generate_mdm_profile(child_email):
                 "PayloadDisplayName": f"GProtect MDM for {child_name}",
                 "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
-                "AccessRights": 8191,  # Full device management
+                "AccessRights": 8191,
                 "IdentityCertificateUUID": APNS_CERT_UUID,
                 "Topic": APNS_TOPIC,
                 "SignMessage": True
@@ -1464,7 +1464,6 @@ def generate_mdm_profile(child_email):
         mimetype="application/x-apple-aspen-config",
         headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
-
 
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
 def update_mdm_profile(child_email):
