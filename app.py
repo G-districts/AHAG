@@ -1294,6 +1294,7 @@ def generate_mdm_profile(child_email):
                 "allowDiagnosticSubmission": False,
                 "allowScreenTime": True
             },
+
             {
                 "PayloadType": "com.apple.screentime",
                 "PayloadVersion": 1,
@@ -1326,6 +1327,11 @@ def generate_mdm_profile(child_email):
         "PayloadDescription": "This profile enforces parental controls on this device. It cannot be removed without parent permission.",
         "PayloadRemovalPassword": "PARENT-SET-PASSWORD"
     }
+ profile['PayloadContent'][0].update({
+    "FilterBrowsers": True,   # Enables filtering in Safari and other browsers
+    "FilterSockets": False,   # Optional
+    "FilterPackets": False    # Optional
+})
 
     plist_data = plistlib.dumps(profile)
 
