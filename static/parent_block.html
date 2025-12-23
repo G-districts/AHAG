@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Blocked - GProtect</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 50px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+
+        .url {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 25px 0;
+            word-break: break-all;
+            font-family: monospace;
+            color: #666;
+        }
+
+        .message {
+            color: #666;
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .reason {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            border-radius: 5px;
+        }
+
+        .reason strong {
+            color: #856404;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+            color: #999;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .icon {
+                font-size: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🛡️</div>
+        <h1>Access Blocked</h1>
+        
+        <div class="url" id="blockedUrl">Loading...</div>
+        
+        <p class="message">
+            Access to <strong id="siteName">this website</strong> has been blocked by your parent or guardian.
+        </p>
+        
+        <div class="reason">
+            <strong>Reason:</strong> <span id="blockReason">Parental controls are active</span>
+        </div>
+        
+        <div class="info" id="scheduleInfo" style="display: none;">
+            <strong>ℹ️ Schedule Information</strong>
+            <p id="scheduleText"></p>
+        </div>
+        
+        <div class="footer">
+            <p>🕒 <span id="currentTime"></span></p>
+            <p style="margin-top: 10px;">If you believe this is an error, please contact your parent or guardian.</p>
+            <p style="margin-top: 15px; font-weight: 600; color: #667eea;">GProtect Parental Control System</p>
+        </div>
+    </div>
+
+    <script>
+        function getParam(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        function extractDomain(url) {
+            try {
+                const u = new URL(url);
+                return u.hostname;
+            } catch {
+                return url;
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleString();
+        }
+
+        function init() {
+            const url = getParam('url') || 'this website';
+            const mode = getParam('mode') || 'parent_block';
+            const reason = getParam('reason') || 'Parental controls are active';
+
+            document.getElementById('blockedUrl').textContent = url;
+            document.getElementById('siteName').textContent = extractDomain(url);
+            document.getElementById('blockReason').textContent = reason;
+
+            // Show schedule info based on mode
+            const scheduleInfo = document.getElementById('scheduleInfo');
+            const scheduleText = document.getElementById('scheduleText');
+
+            if (mode === 'school_hours') {
+                scheduleInfo.style.display = 'block';
+                scheduleText.textContent = 'You are currently in school hours. Access to personal devices is restricted during this time.';
+            } else if (mode === 'homework_hours') {
+                scheduleInfo.style.display = 'block';
+                scheduleText.textContent = 'You are currently in homework hours. Only educational content is allowed during this time.';
+            } else if (mode === 'downtime') {
+                scheduleInfo.style.display = 'block';
+                scheduleText.textContent = 'You are currently in downtime. All apps and websites are blocked during this period.';
+            } else if (mode === 'screen_time') {
+                scheduleInfo.style.display = 'block';
+                scheduleText.textContent = 'You have exceeded your daily screen time limit.';
+            }
+
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
