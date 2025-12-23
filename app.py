@@ -4,11 +4,13 @@ import collections
 # =========================
 # Patch for hyper/apns2 compatibility on Python >= 3.3
 # =========================
+
 if sys.version_info >= (3, 3):
     import collections.abc
     collections.Iterable = collections.abc.Iterable
     collections.Mapping = collections.abc.Mapping
     collections.MutableSet = collections.abc.MutableSet
+    collections.MutableMapping = collections.abc.MutableMapping
 
 # =========================
 # Imports
