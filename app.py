@@ -1,7 +1,8 @@
 # =========================
 # G-SCHOOLS CONNECT BACKEND
 # =========================
-
+import sys
+import collections
 from flask import Flask, request, jsonify, render_template, session, redirect, Response, url_for
 from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
@@ -15,10 +16,13 @@ from functools import wraps
 import plistlib
 import uuid
 from apns_mdm import send_mdm_push
+
+if sys.version_info >= (3, 13):
+    collections.Iterable = collections.abc.Iterable
+    collections.Mapping = collections.abc.Mapping
+
 from apns2.client import APNsClient
 from apns2.payload import Payload
-
-
 
 APNS_CERT = "certs/mdm_push.pem"
 APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
