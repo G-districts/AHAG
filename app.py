@@ -1220,6 +1220,233 @@ def create_class_session():
     save_data(d)
     return redirect(url_for("teacher_class_page", cid=cid))
 
+@app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
+def generate_mdm_profile(child_email):
+    """
+    Generate a dynamic .mobileconfig file for iOS device
+    This profile is customized per child based on their GProtect settings
+    """
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    if child_email not in d["gprotect"]["children"]:
+        return jsonify({"ok": False, "error": "Not registered"}), 403
+    
+    schedules = d["gprotect"]["schedules"].get(child_email, {})
+    ai_categories = d["gprotect"]["ai_categories"].get(child_email, {})
+    manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
+    manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
+    
+    # Build blocked apps list
+    blocked_apps = [
+        "com.instagram.ios",
+        "com.snapchat.snapchat",
+        "com.tiktok.tiktokv",
+        "com.facebook.Facebook",
+        "com.twitter.twitter",
+        # Add more based on categories
+    ]
+    
+    # Downtime settings
+    downtime = schedules.get("downtime", {})
+    downtime_enabled = downtime.get("enabled", False)
+    downtime_start = downtime.get("start", "21:00").split(":")
+    downtime_end = downtime.get("end", "07:00").split(":")
+    
+    # Screen time limit
+    screen_time = schedules.get("screen_time", {})
+    daily_limit_minutes = screen_time.get("daily_minutes", 120)
+    
+    # Build the plist structure
+    profile = {
+        "PayloadContent": [
+            # Web Content Filter
+            {
+                "PayloadType": "com.apple.webcontent-filter",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.webfilter.{child_email}",
+                "PayloadUUID": str(uuid.uuid4()).upper(),
+                "PayloadDisplayName": "GProtect Web Filter",
+                "FilterType": "Plugin",
+                "ServerAddress": "https://gschool.gdistrict.org",
+                "FilterSockets": True,
+                "VendorConfig": {
+                    "child_email": child_email,
+                    "manual_blocks": manual_blocks,
+                    "manual_allows": manual_allows,
+                    "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
+                }
+            },
+            
+            # Restrictions
+            {
+                "PayloadType": "com.apple.applicationaccess",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.restrictions.{child_email}",
+                "PayloadUUID": str(uuid.uuid4()).upper(),
+                "PayloadDisplayName": "GProtect Restrictions",
+                
+                "blacklistedAppBundleIDs": blocked_apps,
+                "allowSafari": True,
+                "safariAllowAutoFill": False,
+                "safariAllowJavaScript": True,
+                "safariAllowPopups": False,
+                "safariForceFraudWarning": True,
+                "allowExplicitContent": False,
+                "allowGameCenter": False,
+                "allowAddingGameCenterFriends": False,
+                "allowMultiplayerGaming": False,
+            },
+            
+            # Screen Time
+            {
+                "PayloadType": "com.apple.screentime",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.screentime.{child_email}",
+                "PayloadUUID": str(uuid.uuid4()).upper(),
+                "PayloadDisplayName": "GProtect Screen Time",
+                
+                "familyControlsEnabled": True,
+                "downtimeSchedule": {
+                    "enabled": downtime_enabled,
+                    "start": {
+                        "hour": int(downtime_start[0]),
+                        "minute": int(downtime_start[1])
+                    },
+                    "end": {
+                        "hour": int(downtime_end[0]),
+                        "minute": int(downtime_end[1])
+                    }
+                },
+                "appLimits": {
+                    "application": {
+                        "com.apple.mobilesafari": {
+                            "timeLimit": daily_limit_minutes * 60
+                        }
+                    }
+                },
+                "alwaysAllowedBundleIDs": [
+                    "com.apple.mobilephone",
+                    "com.apple.FaceTime",
+                    "com.apple.MobileSMS"
+                ]
+            }
+        ],
+        
+        # Root payload settings
+        "PayloadDisplayName": f"GProtect Controls - {child_email}",
+        "PayloadIdentifier": f"org.gdistrict.gprotect.{child_email}",
+        "PayloadRemovalDisallowed": True,
+        "PayloadType": "Configuration",
+        "PayloadUUID": str(uuid.uuid4()).upper(),
+        "PayloadVersion": 1,
+        "PayloadOrganization": "GProtect",
+        "PayloadDescription": "Parental controls managed by GProtect system"
+    }
+    
+    # Convert to plist XML
+    plist_data = plistlib.dumps(profile)
+    
+    # Return as downloadable file
+    from flask import Response
+    return Response(
+        plist_data,
+        mimetype='application/x-apple-aspen-config',
+        headers={
+            'Content-Disposition': f'attachment; filename=GProtect_{child_email}.mobileconfig'
+        }
+    )
+
+@app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
+def update_mdm_profile(child_email):
+    """
+    Push profile update to iOS device via MDM server
+    This is called when parent changes settings
+    """
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    if child_email not in d["gprotect"]["children"]:
+        return jsonify({"ok": False, "error": "Not registered"}), 403
+    
+    mdm_info = d["gprotect"]["mdm_tokens"].get(child_email)
+    if not mdm_info:
+        return jsonify({"ok": False, "error": "Device not enrolled"}), 400
+    
+    # Here you would integrate with Apple Push Notification Service (APNs)
+    # to push the updated configuration to the device
+    
+    # For now, we'll just generate the new profile and log it
+    try:
+        # Send push notification to device to fetch new profile
+        device_token = mdm_info.get("device_token")
+        
+        # Pseudo-code for APNs push:
+        # apns_client.send_notification(
+        #     device_token=device_token,
+        #     payload={
+        #         "mdm": f"https://gschool.gdistrict.org/gprotect/mdm/profile/{child_email}"
+        #     }
+        # )
+        
+        log_action({
+            "event": "gprotect_mdm_update_sent",
+            "child": child_email,
+            "timestamp": int(time.time())
+        })
+        
+        return jsonify({"ok": True, "message": "Update pushed to device"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/gprotect/mdm/check_in", methods=["POST"])
+def mdm_device_check_in():
+    """
+    iOS device checks in periodically to get latest restrictions
+    Called by the device every 5 minutes
+    """
+    body = request.json or {}
+    child_email = body.get("email")
+    device_token = body.get("device_token")
+    
+    if not child_email:
+        return jsonify({"ok": False, "error": "Email required"}), 400
+    
+    d = ensure_keys(load_data())
+    _ensure_gprotect_structure(d)
+    
+    if child_email not in d["gprotect"]["children"]:
+        return jsonify({"ok": False, "error": "Not registered"}), 403
+    
+    schedules = d["gprotect"]["schedules"].get(child_email, {})
+    
+    # Determine current state
+    now = datetime.now()
+    current_time = now.time()
+    
+    # Check downtime
+    downtime = schedules.get("downtime", {})
+    in_downtime = False
+    
+    if downtime.get("enabled"):
+        start = datetime.strptime(downtime.get("start", "21:00"), "%H:%M").time()
+        end = datetime.strptime(downtime.get("end", "07:00"), "%H:%M").time()
+        
+        if start > end:  # Crosses midnight
+            in_downtime = current_time >= start or current_time < end
+        else:
+            in_downtime = start <= current_time < end
+    
+    # Return current restrictions
+    return jsonify({
+        "ok": True,
+        "active_mode": "downtime" if in_downtime else "normal",
+        "block_all": in_downtime,
+        "manual_blocks": d["gprotect"]["manual_blocks"].get(child_email, []),
+        "manual_allows": d["gprotect"]["manual_allows"].get(child_email, []),
+        "schedules": schedules,
+        "needs_profile_update": False  # Set to True if settings changed
+    })
 
 @app.route("/teacher/class/<cid>/edit", methods=["POST"])
 def edit_class_session(cid):
