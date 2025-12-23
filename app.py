@@ -12,6 +12,7 @@ from collections import defaultdict
 from image_filter_ai import classify_image as _gschool_classify_image
 import jwt
 from functools import wraps
+import plistlib
 
 # ---------------------------
 # Flask App Initialization
