@@ -14,9 +14,17 @@ import jwt
 from functools import wraps
 import plistlib
 import uuid
+from apns2.client import APNsClient
+from apns2.payload import Payload
 
-APNS_CERT_UUID = str(uuid.uuid4()).upper()  # Fake certificate UUID
-APNS_TOPIC = "gschool.gdistrict.org"       # Fake topic for testing
+APNS_CERT = os.path.join("certs", "mdm_push.pem")
+APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
+
+apns_client = APNsClient(
+    APNS_CERT,
+    use_sandbox=False,  # True if testing on development devices
+    use_alternative_port=False
+)
 # ---------------------------
 # Flask App Initialization
 # ---------------------------
@@ -1464,48 +1472,37 @@ def generate_mdm_profile(child_email):
         mimetype="application/x-apple-aspen-config",
         headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
-
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
 def update_mdm_profile(child_email):
-    """
-    Push profile update to iOS device via MDM server
-    This is called when parent changes settings
-    """
     d = ensure_keys(load_data())
     _ensure_gprotect_structure(d)
-    
+
     if child_email not in d["gprotect"]["children"]:
         return jsonify({"ok": False, "error": "Not registered"}), 403
-    
+
     mdm_info = d["gprotect"]["mdm_tokens"].get(child_email)
     if not mdm_info:
         return jsonify({"ok": False, "error": "Device not enrolled"}), 400
-    
-    # Here you would integrate with Apple Push Notification Service (APNs)
-    # to push the updated configuration to the device
-    
-    # For now, we'll just generate the new profile and log it
+
+    device_token = mdm_info.get("device_token")
+    if not device_token:
+        return jsonify({"ok": False, "error": "No device token for child"}), 400
+
     try:
-        # Send push notification to device to fetch new profile
-        device_token = mdm_info.get("device_token")
-        
-        # Pseudo-code for APNs push:
-        # apns_client.send_notification(
-        #     device_token=device_token,
-        #     payload={
-        #         "mdm": f"https://gschool.gdistrict.org/gprotect/mdm/profile/{child_email}"
-        #     }
-        # )
-        
+        # Send APNs push to device telling it to fetch the latest profile
+        payload = Payload(custom={"mdm": f"https://gschool.gdistrict.org/gprotect/mdm/profile/{child_email}"})
+        apns_client.send_notification(device_token, payload, APNS_TOPIC)
+
         log_action({
             "event": "gprotect_mdm_update_sent",
             "child": child_email,
             "timestamp": int(time.time())
         })
-        
+
         return jsonify({"ok": True, "message": "Update pushed to device"})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
 
 @app.route("/gprotect/mdm/check_in", methods=["POST"])
 def mdm_device_check_in():
