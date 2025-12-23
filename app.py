@@ -7,9 +7,11 @@ from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
 from urllib.parse import urlparse
 import random, time, hashlib
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from collections import defaultdict
 from image_filter_ai import classify_image as _gschool_classify_image
+import jwt
+from functools import wraps
 
 # ---------------------------
 # Flask App Initialization
@@ -323,10 +325,6 @@ Parental control
 # =========================
 
 # Add these imports at the top of app.py if not already present
-from datetime import datetime, time as dt_time
-import jwt
-from functools import wraps
-
 # JWT secret for parent tokens (add to top of file)
 PARENT_JWT_SECRET = os.environ.get("PARENT_JWT_SECRET", "gprotect_secret_key_change_in_production")
 
