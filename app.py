@@ -1389,6 +1389,7 @@ def mdm_checkin():
         print("MDM checkin error:", e)
         return Response(plistlib.dumps({}), mimetype="application/xml")
 
+
 # Load your PEM bytes (certificate + private key)
 pem_bytes = b"""-----BEGIN CERTIFICATE-----
 MIIFdjCCBF6gAwIBAgIIUviYoaDmrWwwDQYJKoZIhvcNAQELBQAwgYwxQDA+BgNV
@@ -1451,23 +1452,25 @@ XKdUAfSTlgHvBEx9hRG7oQNreThMFPPDuGjy/Hq5QeHa2tlHjmoq97j5YvE4MgQE
 rpovpSuatV9/0JBlHvL8eVo=
 -----END PRIVATE KEY-----"""
 
-# Extract certificate only
-cert_pem = b"\n".join(pem_bytes.split(b"-----END CERTIFICATE-----")[:1]) + b"\n-----END CERTIFICATE-----\n"
+# Extract certificate safely
+cert_start = pem_bytes.find(b"-----BEGIN CERTIFICATE-----")
+cert_end = pem_bytes.find(b"-----END CERTIFICATE-----", cert_start) + len(b"-----END CERTIFICATE-----")
+cert_pem = pem_bytes[cert_start:cert_end] + b"\n"
 
-# Load certificate and get CN
+# Load certificate and generate deterministic UUID
 cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
 cn = cert_obj.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
-
-# Generate deterministic UUID for IdentityCertificate
 identity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, cn)).upper()
 
-# Base64 encode the full PEM (cert + key)
+# Base64 encode full PEM (certificate + key) for IdentityCertificate
 identity_b64 = base64.b64encode(pem_bytes).decode("ascii")
 
-
+# ------------------------------
+# Route to generate MDM profile
+# ------------------------------
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
-    # Example data structure, replace with your actual data handling
+    # Example data
     d = {"gprotect": {"children": [child_email], "schedules": {}, "manual_blocks": {}, "manual_allows": {}}}
     
     if child_email not in d["gprotect"]["children"]:
@@ -1514,17 +1517,24 @@ def generate_mdm_profile(child_email):
             "URL": url
         })
 
+    # ----------------------
+    # Identity Certificate Payload (first!)
+    # ----------------------
+    identity_payload = {
+        "PayloadType": "com.apple.security.pem",
+        "PayloadVersion": 1,
+        "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
+        "PayloadUUID": identity_uuid,
+        "PayloadDisplayName": "GProtect Student Identity",
+        "PayloadContent": identity_b64,
+    }
+
+    # ----------------------
+    # Build profile
+    # ----------------------
     profile = {
         "PayloadContent": [
-            # Identity Certificate Payload
-            {
-                "PayloadType": "com.apple.security.pem",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
-                "PayloadUUID": identity_uuid,
-                "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
-                "PayloadContent": identity_b64,
-            },
+            identity_payload,  # <-- MUST be first
             # MDM Payload
             {
                 "PayloadType": "com.apple.mdm",
@@ -1535,15 +1545,15 @@ def generate_mdm_profile(child_email):
                 "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
-                "IdentityCertificateUUID": identity_uuid,  # MUST match identity_payload UUID
-                "Topic": "YOUR_APNS_TOPIC",
+                "IdentityCertificateUUID": identity_uuid,  # <-- link to identity payload
+                "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",
                 "SignMessage": True
             },
-            # Web Content Filter (example)
+            # Web Content Filter
             {
                 "PayloadType": "com.apple.webcontent-filter",
                 "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.webfilter.{child_email}",
+                "PayloadIdentifier": "org.gdistrict.gprotect.webfilter",
                 "PayloadUUID": new_uuid(),
                 "PayloadDisplayName": f"GProtect Web Filter for {child_name}",
                 "PayloadDescription": "Content filtering controlled by parent",
@@ -1569,7 +1579,7 @@ def generate_mdm_profile(child_email):
             {
                 "PayloadType": "com.apple.applicationaccess",
                 "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.restrictions.{child_email}",
+                "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
                 "PayloadUUID": new_uuid(),
                 "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
                 "blacklistedAppBundleIDs": list(all_blocked_apps),
@@ -1596,6 +1606,7 @@ def generate_mdm_profile(child_email):
         mimetype="application/x-apple-aspen-config",
         headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
+
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
 def update_mdm_profile(child_email):
     d = ensure_keys(load_data())
