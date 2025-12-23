@@ -29,20 +29,6 @@ from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
 
-# --- Load your APNS certificate from P12 ---
-P12_PATH = "mdm_identity.p12"
-P12_PASSWORD = b"supersecret"  # password as bytes
-
-with open(P12_PATH, "rb") as f:
-    p12_data = f.read()
-
-p12 = crypto.load_pkcs12(p12_data, P12_PASSWORD)
-cert = p12.get_certificate()
-
-# Generate a UUID from certificate CN (or use fixed if you prefer)
-APNS_CERT_UUID = str(uuid.uuid5(uuid.NAMESPACE_DNS, cert.get_subject().CN)).upper()
-APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
-
 # ---------------------------
 # Flask App Initialization
 # ---------------------------
@@ -83,6 +69,28 @@ SCENES_PATH = os.path.join(ROOT, "scenes.json")
 # =========================
 # Helpers: Data & Database
 # =========================
+
+def load_apns_cert():
+    from OpenSSL import crypto
+    P12_PATH = "mdm_identity.p12"
+    P12_PASSWORD = b"supersecret"
+
+    try:
+        with open(P12_PATH, "rb") as f:
+            p12_data = f.read()
+        p12 = crypto.load_pkcs12(p12_data, P12_PASSWORD)
+        cert = p12.get_certificate()
+        uuid_val = str(uuid.uuid5(uuid.NAMESPACE_DNS, cert.get_subject().CN)).upper()
+        return uuid_val
+    except Exception as e:
+        print("[WARN] Failed to load APNS certificate:", e)
+        return None
+
+APNS_CERT_UUID = load_apns_cert()
+APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
+
+
+
 def _clean_expired_bypass_codes(settings):
     now = time.time()
     settings["bypass_codes"] = [
