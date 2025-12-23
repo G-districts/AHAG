@@ -1488,18 +1488,8 @@ def update_mdm_profile(child_email):
     if not device_token:
         return jsonify({"ok": False, "error": "No device token for child"}), 400
 
-try:
-    # Wake the device via APNs (MDM-style push)
-    send_mdm_push(device_token)
-
-    log_action({
-        "event": "gprotect_mdm_update_sent",
-        "child": child_email,
-        "timestamp": int(time.time())
-    })
-
-    return jsonify({"ok": True, "message": "Update pushed to device"})
-
+    try:
+        send_mdm_push(device_token)
 
         log_action({
             "event": "gprotect_mdm_update_sent",
@@ -1508,6 +1498,7 @@ try:
         })
 
         return jsonify({"ok": True, "message": "Update pushed to device"})
+
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
