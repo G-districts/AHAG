@@ -318,7 +318,7 @@ def _is_guest_identity(email: str, name: str) -> bool:
         return True
     return False
 #=========================
-Parental control
+# Parental control
 #=========================
 # =========================
 # GPROTECT - PARENT CONTROLS
