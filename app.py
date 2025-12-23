@@ -28,6 +28,14 @@ from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
 
+# Load your PKCS12 file
+with open("mdm_identity.p12", "rb") as f:
+    p12_data = f.read()
+
+p12 = crypto.load_pkcs12(p12_data, b"supersecret")  # password as bytes
+cert = crypto.dump_certificate(crypto.FILETYPE_PEM, p12.get_certificate())
+key = crypto.dump_privatekey(crypto.FILETYPE_PEM, p12.get_privatekey())
+
 APNS_CERT = "mdm_push.pem"  # now in root
 APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
 APNS_CERT_UUID = "9507ef8f-dcbb-483e-89db-298d5471c6c1"  # match your APNS_TOPIC suffix
