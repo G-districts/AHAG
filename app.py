@@ -30,14 +30,6 @@ from apns2.client import APNsClient
 from apns2.payload import Payload
 import uuid
 
-# ===============================
-# MDM Identity Certificate
-# ===============================
-IDENTITY_CERT_UUID = str(uuid.uuid4()).upper()
-IDENTITY_CERT_PASSWORD = "supersecret"
-
-with open("mdm_identity.p12", "rb") as f:
-    IDENTITY_P12_B64 = base64.b64encode(f.read()).decode("utf-8")
 
 # ---------------------------
 # Flask App Initialization
@@ -1411,6 +1403,10 @@ def generate_mdm_profile(child_email):
     def new_uuid():
         return str(uuid.uuid4()).upper()
 
+    PROFILE_UUID = new_uuid()
+    IDENTITY_CERT_UUID = new_uuid()
+    MDM_PAYLOAD_UUID = new_uuid()
+
     # ----------------------
     # Apps
     # ----------------------
@@ -1456,7 +1452,8 @@ def generate_mdm_profile(child_email):
         })
 
     # ===============================
-    # IDENTITY PAYLOAD (MUST BE FIRST)
+    # IDENTITY CERT PAYLOAD (PKCS#12)
+    # MUST BE FIRST
     # ===============================
     identity_payload = {
         "PayloadType": "com.apple.security.pkcs12",
@@ -1464,8 +1461,8 @@ def generate_mdm_profile(child_email):
         "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
         "PayloadUUID": IDENTITY_CERT_UUID,
         "PayloadDisplayName": "GProtect Student Identity",
-        "Password": IDENTITY_CERT_PASSWORD,
-        "PayloadContent": IDENTITY_P12_B64,
+        "Password": IDENTITY_CERT_PASSWORD,   # "" if none
+        "PayloadContent": IDENTITY_P12_B64     # base64 ONLY
     }
 
     # ===============================
@@ -1475,7 +1472,7 @@ def generate_mdm_profile(child_email):
         "PayloadType": "com.apple.mdm",
         "PayloadVersion": 1,
         "PayloadIdentifier": f"org.gdistrict.gprotect.mdm.{child_email}",
-        "PayloadUUID": new_uuid(),
+        "PayloadUUID": MDM_PAYLOAD_UUID,
         "PayloadDisplayName": f"GProtect MDM for {child_name}",
         "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
         "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
@@ -1491,7 +1488,7 @@ def generate_mdm_profile(child_email):
     web_filter_payload = {
         "PayloadType": "com.apple.webcontent-filter",
         "PayloadVersion": 1,
-        "PayloadIdentifier": "org.gdistrict.gprotect.webfilter",
+        "PayloadIdentifier": f"org.gdistrict.gprotect.webfilter.{child_email}",
         "PayloadUUID": new_uuid(),
         "PayloadDisplayName": f"GProtect Web Filter for {child_name}",
         "FilterType": "Plugin",
@@ -1515,7 +1512,7 @@ def generate_mdm_profile(child_email):
     restrictions_payload = {
         "PayloadType": "com.apple.applicationaccess",
         "PayloadVersion": 1,
-        "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
+        "PayloadIdentifier": f"org.gdistrict.gprotect.restrictions.{child_email}",
         "PayloadUUID": new_uuid(),
         "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
         "blacklistedAppBundleIDs": list(all_blocked_apps),
@@ -1530,17 +1527,15 @@ def generate_mdm_profile(child_email):
     profile = {
         "PayloadType": "Configuration",
         "PayloadVersion": 1,
-        "PayloadUUID": new_uuid(),
+        "PayloadUUID": PROFILE_UUID,
         "PayloadIdentifier": "org.gdistrict.gprotect",
         "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
         "PayloadOrganization": "GProtect",
         "PayloadRemovalDisallowed": True,
-        "PayloadContent": [
-            identity_payload,     # MUST BE FIRST
-            mdm_payload,
-            web_filter_payload,
-            restrictions_payload
-        ] + webclips
+        "PayloadContent": (
+            [identity_payload, mdm_payload, web_filter_payload, restrictions_payload]
+            + webclips
+        )
     }
 
     plist_data = plistlib.dumps(profile)
