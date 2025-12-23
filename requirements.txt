@@ -12,3 +12,4 @@ Pillow==10.4.0
 PyJWT>=2.8.0
 apns2==0.3.0
 httpx>=0.25.0
+pyopenssl==23.2.0
