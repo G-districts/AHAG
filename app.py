@@ -1481,7 +1481,7 @@ def generate_mdm_profile(child_email):
                 "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
-                "IdentityCertificate": APNS_CERT_B64,
+                "IdentityCertificate": identity_b64,
                 "Topic": "YOUR_APNS_TOPIC",  # Replace with your APNS topic
                 "SignMessage": True
             },
