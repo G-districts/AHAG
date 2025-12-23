@@ -165,7 +165,7 @@ with open("GProtectStudent.mobileconfig", "wb") as f:
     plistlib.dump(mobileconfig, f)
 
 print("✅ GProtectStudent.mobileconfig created successfully!")
-print("IdentityCertificateUUID:", identity_uuid
+print("IdentityCertificateUUID:", identity_uuid)
 # =========================
 # Helpers: Data & Database
 # =========================
