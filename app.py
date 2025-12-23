@@ -28,8 +28,16 @@ import plistlib
 from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
-from cryptography import x509
-from cryptography.hazmat.backends import default_backend
+import uuid
+
+# ===============================
+# MDM Identity Certificate
+# ===============================
+IDENTITY_CERT_UUID = str(uuid.uuid4()).upper()
+IDENTITY_CERT_PASSWORD = "supersecret"
+
+with open("mdm_identity.p12", "rb") as f:
+    IDENTITY_P12_B64 = base64.b64encode(f.read()).decode("utf-8")
 
 # ---------------------------
 # Flask App Initialization
@@ -1389,84 +1397,12 @@ def mdm_checkin():
         print("MDM checkin error:", e)
         return Response(plistlib.dumps({}), mimetype="application/xml")
 
-
-# Your PEM with certificate + private key
-pem_bytes = b"""-----BEGIN CERTIFICATE-----
-MIIFdjCCBF6gAwIBAgIIUviYoaDmrWwwDQYJKoZIhvcNAQELBQAwgYwxQDA+BgNV
-BAMMN0FwcGxlIEFwcGxpY2F0aW9uIEludGVncmF0aW9uIDIgQ2VydGlmaWNhdGlv
-biBBdXRob3JpdHkxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9y
-aXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzAeFw0yNTEyMjMw
-NjM1MTBaFw0yNjEyMjMwNjM1MDlaMIGPMUwwSgYKCZImiZPyLGQBAQw8Y29tLmFw
-cGxlLm1nbXQuRXh0ZXJuYWwuOTUwN2VmOGYtZGNiYi00ODNlLTg5ZGItMjk4ZDU0
-NzFjNmMxMTIwMAYDVQQDDClBUFNQOjk1MDdlZjhmLWRjYmItNDgzZS04OWRiLTI5
-OGQ1NDcxYzZjMTELMAkGA1UEBhMCVVMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
-ggEKAoIBAQC7Lbflim3TyTkXq4dz6KlYwamQJjtaCRvS6RzEaJaZTw4cDURtvhvf
-c/JRD3YApOUfOWvobQ5+qYoNwksxB6uwAWksboZ74dVIzqFb1ga441DjAgiREfAN
-TmHUB/N77cPbz9DQCBb4LZwZzHPyInss016MRhmMWyZ4GwQ7VerOedRzvblZJFS5
-HiTeMkKIggHyG/AlS47wneVNXT7n6QYqosJTci68HhNaj5Gr/j2F1BFEZktB9AvB
-cYm5bjSW2wGxpi3pdnV1vesu0sfUUGFmivU2EL9m1ZRj5pzrPdyrD6AlPqgg0p+v
-VsnH8Oe52YdMUm3igQ+Y+pm404JCrRgnAgMBAAGjggHVMIIB0TAJBgNVHRMEAjAA
-MB8GA1UdIwQYMBaAFPe+fCFgkds9G3vYOjKBad+ebH+bMIIBHAYDVR0gBIIBEzCC
-AQ8wggELBgkqhkiG92NkBQEwgf0wgcMGCCsGAQUFBwICMIG2DIGzUmVsaWFuY2Ug
-b24gdGhpcyBjZXJ0aWZpY2F0ZSBieSBhbnkgcGFydHkgYXNzdW1lcyBhY2NlcHRh
-bmNlIG9mIHRoZSB0aGVuIGFwcGxpY2FibGUgc3RhbmRhcmQgdGVybXMgYW5kIGNv
-bmRpdGlvbnMgb2YgdXNlLCBjZXJ0aWZpY2F0ZSBwb2xpY3kgYW5kIGNlcnRpZmlj
-YXRpb24gcHJhY3RpY2Ugc3RhdGVtZW50cy4wNQYIKwYBBQUHAgEWKWh0dHA6Ly93
-d3cuYXBwbGUuY29tL2NlcnRpZmljYXRlYXV0aG9yaXR5MBMGA1UdJQQMMAoGCCsG
-AQUFBwMCMDAGA1UdDwQEAwIHgDAQBgoqhkiG92NkBgMCBAIFADANBgkqhkiG9w0B
-AQsFAAOCAQEAdcO6YU/kyc+NXtpmNzSOfPO4gZfRiQMg7go2qpvju4gJ7h3v23Xg
-P8+vuDUphIrjf3HNChDOwWQWdCE6r/c4fqGxZ9DOtD7OhSGWPnqqvix4Mu5SfyJv
-Psu0V1IQdt07OivxekczFk4CKciGM4akm71sXv4r/QreMtvZyMhpnCz1fh5CckXK
-ZJS81viNXGw8J+9CHm64b95FAZtNp9UqgAZ/itftRGNJ98jguaghBspchZxlr0us
-UlJpRDI3M5A0JtgmG4HUqSWBTxlS7bCGzYXbCdbDoAG5f2iXLvBvyPfI6V+HvQll
-PI8tse6mgWk5HkzksacurVZuHfqCRAdX0Q==
------END CERTIFICATE-----
------BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7Lbflim3TyTkX
-q4dz6KlYwamQJjtaCRvS6RzEaJaZTw4cDURtvhvfc/JRD3YApOUfOWvobQ5+qYoN
-wksxB6uwAWksboZ74dVIzqFb1ga441DjAgiREfANTmHUB/N77cPbz9DQCBb4LZwZ
-zHPyInss016MRhmMWyZ4GwQ7VerOedRzvblZJFS5HiTeMkKIggHyG/AlS47wneVN
-XT7n6QYqosJTci68HhNaj5Gr/j2F1BFEZktB9AvBcYm5bjSW2wGxpi3pdnV1vesu
-0sfUUGFmivU2EL9m1ZRj5pzrPdyrD6AlPqgg0p+vVsnH8Oe52YdMUm3igQ+Y+pm4
-04JCrRgnAgMBAAECggEAN4cekPf6EOQXDdCTBG23H1+EYAEXhmRBXtZM9G9ajeyH
-8QZ2kF/fgPCyqB2AEjzYw+STAIap0CWXkPFcwRTXeAVTIB1BxCqAzXKPJ+FcaSj2
-bAHEbNT3c9sW5oHdV5x3iBQkjDJ6LfHJ51Vh6CkWhXvHBrIdDihURzksjjW0zL+R
-QgzbE92pNxIqntJGFy0ZzOnQzVh1ZWlPAUh0SUqgoJH1pg7sA3hk2zRONS/B1pca
-QHchibl3yGMqaLcxmBqlXaKavbhEsZ5AXYpEcTJA/pBET7qzaIZUWGB/ZGkXSe98
-RebbICSUVPEcTjWqGp8q0l46pR7AniArCNrAgSkQwQKBgQDIGstXwnFJA+tdriYA
-OHg3omuSZxMmQj9Xp7FN9yYRdCjuJoL1HaTxEkpYrRnGuLo3oTJh/Il9oER5HoFd
-TdXZJt7iKdoZKEeQjqMwo8yHkOcXpbUibEmsjhe0+kKSrngDUviodsfjgYxbSglI
-LFaJ6rt7hse/hzhCNuywGHQwtwKBgQDvdpkk7iW4I1afrC2WOO1PP7Vz2VQacTy1
-KvV5MyOvOdoojUJqYsRXdRpo+/hBGZ4KGV/4HNj09/ncEaW7q1nU33iuhpvvCo9E
-UqynjOobL8RuFsiLh2obT2/yLHBnT2Di4T43ZtbtqwvN6VnVOB4ikm0+18t1+tZr
-giQ3NmUEEQKBgQCEFHuHr8aKxVWD/kEDAEMJpeGPPw36wNuChiOYLLwp5RxnJXBn
-Tmvi24nLQmazLpdrxLC20LQIAdNwhtwotAmlTezsJ2fYFyg1mJDKuDN2gASpLS2E
-TSnMBfZL9KwgmZyJxShwOgbyej4ku5eo1etBGXkqreoG18AgpJRSH7IBvQKBgBLz
-3Q0aOCwJx/pdQ0JngQjLrw3bPpfVLIveOY19Ka7dslGRVJdc99NANnXms3BbmbGM
-7paRme5RjhoH34kp97MseL2/c6oIuOwcawPb2E+MiUx5SygX8KL2t5KAR+k1VCLA
-1w7Fee9XoViLxotkpKXx1umpZLYSw1PA+iLQkFAxAoGAK1Q96Zz5GLrX+dDi8Gti
-GA79WwpbgS8+i7rMR+xWnmNzNt+nHTtiVxsvxPdZnMtOq5vFSImW8Ufg1uUGUf8V
-XKdUAfSTlgHvBEx9hRG7oQNreThMFPPDuGjy/Hq5QeHa2tlHjmoq97j5YvE4MgQE
-rpovpSuatV9/0JBlHvL8eVo=
------END PRIVATE KEY-----"""
-
-# Convert PEM -> PKCS12 + base64
-def pem_to_p12_b64(pem_bytes, name=b"GProtect Student", password=b""):
-    cert_pem = b"-----BEGIN CERTIFICATE-----" + pem_bytes.split(b"-----BEGIN CERTIFICATE-----")[1].split(b"-----END CERTIFICATE-----")[0] + b"-----END CERTIFICATE-----\n"
-    cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
-    key_pem = b"-----BEGIN PRIVATE KEY-----" + pem_bytes.split(b"-----BEGIN PRIVATE KEY-----")[1].split(b"-----END PRIVATE KEY-----")[0] + b"-----END PRIVATE KEY-----\n"
-    key_obj = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
-    p12 = pkcs12.serialize_key_and_certificates(name, key_obj, cert_obj, None, serialization.NoEncryption())
-    return base64.b64encode(p12).decode("ascii"), cert_obj
-
-identity_b64, cert_obj = pem_to_p12_b64(pem_bytes)
-identity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, cert_obj.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value)).upper()
-
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
-    # Example data
+
+    # Mock data (replace later)
     d = {"gprotect": {"children": [child_email], "schedules": {}, "manual_blocks": {}, "manual_allows": {}}}
-    
+
     if child_email not in d["gprotect"]["children"]:
         return jsonify({"ok": False, "error": "Not registered"}), 403
 
@@ -1475,7 +1411,15 @@ def generate_mdm_profile(child_email):
     def new_uuid():
         return str(uuid.uuid4()).upper()
 
-    always_allowed = ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
+    # ----------------------
+    # Apps
+    # ----------------------
+    always_allowed = [
+        "com.apple.mobilephone",
+        "com.apple.FaceTime",
+        "com.apple.MobileSMS"
+    ]
+
     downtime_apps = [
         "com.instagram.ios",
         "com.snapchat.snapchat",
@@ -1484,17 +1428,19 @@ def generate_mdm_profile(child_email):
         "com.twitter.twitter",
         "com.apple.mobilesafari",
     ]
+
     manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
     manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
-    schedules = d["gprotect"]["schedules"].get(child_email, {})
-
     all_blocked_apps = set(downtime_apps + manual_blocks)
 
+    # ----------------------
+    # WebClips
+    # ----------------------
     webclips = []
     for app_bundle in all_blocked_apps:
         if app_bundle in always_allowed:
             continue
-        url = f"https://blocked.gdistrict.org/parent_block?website={app_bundle}"
+
         display_name = f"{app_bundle} (Blocked)"
         webclips.append({
             "PayloadType": "com.apple.webClip.managed",
@@ -1506,82 +1452,95 @@ def generate_mdm_profile(child_email):
             "PayloadDescription": f"Overlay for {display_name}",
             "IsRemovable": False,
             "Precomposed": True,
-            "URL": url
+            "URL": f"https://blocked.gdistrict.org/parent_block?website={app_bundle}"
         })
 
-    # Identity Certificate payload (PKCS12)
+    # ===============================
+    # IDENTITY PAYLOAD (MUST BE FIRST)
+    # ===============================
     identity_payload = {
         "PayloadType": "com.apple.security.pkcs12",
         "PayloadVersion": 1,
         "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
-        "PayloadUUID": identity_uuid,
+        "PayloadUUID": IDENTITY_CERT_UUID,
         "PayloadDisplayName": "GProtect Student Identity",
-        "PayloadContent": identity_b64,
-        "Password": ""
+        "Password": IDENTITY_CERT_PASSWORD,
+        "PayloadContent": IDENTITY_P12_B64,
     }
 
-    profile = {
-        "PayloadContent": [
-            identity_payload,
-            {
-                "PayloadType": "com.apple.mdm",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.mdm.{child_email}",
-                "PayloadUUID": new_uuid(),
-                "PayloadDisplayName": f"GProtect MDM for {child_name}",
-                "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
-                "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
-                "AccessRights": 8191,
-                "IdentityCertificateUUID": identity_uuid,
-                "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",
-                "SignMessage": True
-            },
-            {
-                "PayloadType": "com.apple.webcontent-filter",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": "org.gdistrict.gprotect.webfilter",
-                "PayloadUUID": new_uuid(),
-                "PayloadDisplayName": f"GProtect Web Filter for {child_name}",
-                "PayloadDescription": "Content filtering controlled by parent",
-                "FilterType": "Plugin",
-                "UserDefinedName": "GProtect Filter",
-                "PluginBundleID": "org.gdistrict.gprotect.filter",
-                "ServerAddress": "https://gschool.gdistrict.org",
-                "Organization": "GProtect",
-                "FilterDataProviderBundleIdentifier": "org.gdistrict.gprotect.dataprovider",
-                "FilterDataProviderDesignatedRequirement": 'identifier "org.gdistrict.gprotect.dataprovider"',
-                "ContentFilterUUID": new_uuid(),
-                "FilterBrowsers": True,
-                "FilterSockets": False,
-                "FilterPackets": False,
-                "VendorConfig": {
-                    "child_email": child_email,
-                    "manual_blocks": manual_blocks,
-                    "manual_allows": manual_allows,
-                    "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
-                }
-            },
-            {
-                "PayloadType": "com.apple.applicationaccess",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
-                "PayloadUUID": new_uuid(),
-                "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
-                "blacklistedAppBundleIDs": list(all_blocked_apps),
-                "whitelistedAppBundleIDs": always_allowed,
-                "allowSafari": True,
-                "allowScreenTime": False
-            }
-        ] + webclips,
-        "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
-        "PayloadIdentifier": "org.gdistrict.gprotect",
-        "PayloadRemovalDisallowed": True,
-        "PayloadType": "Configuration",
-        "PayloadUUID": new_uuid(),
+    # ===============================
+    # MDM PAYLOAD
+    # ===============================
+    mdm_payload = {
+        "PayloadType": "com.apple.mdm",
         "PayloadVersion": 1,
+        "PayloadIdentifier": f"org.gdistrict.gprotect.mdm.{child_email}",
+        "PayloadUUID": new_uuid(),
+        "PayloadDisplayName": f"GProtect MDM for {child_name}",
+        "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
+        "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
+        "AccessRights": 8191,
+        "IdentityCertificateUUID": IDENTITY_CERT_UUID,
+        "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",
+        "SignMessage": True
+    }
+
+    # ===============================
+    # WEB CONTENT FILTER
+    # ===============================
+    web_filter_payload = {
+        "PayloadType": "com.apple.webcontent-filter",
+        "PayloadVersion": 1,
+        "PayloadIdentifier": "org.gdistrict.gprotect.webfilter",
+        "PayloadUUID": new_uuid(),
+        "PayloadDisplayName": f"GProtect Web Filter for {child_name}",
+        "FilterType": "Plugin",
+        "UserDefinedName": "GProtect Filter",
+        "PluginBundleID": "org.gdistrict.gprotect.filter",
+        "ServerAddress": "https://gschool.gdistrict.org",
+        "Organization": "GProtect",
+        "FilterBrowsers": True,
+        "FilterSockets": False,
+        "FilterPackets": False,
+        "VendorConfig": {
+            "child_email": child_email,
+            "manual_blocks": manual_blocks,
+            "manual_allows": manual_allows
+        }
+    }
+
+    # ===============================
+    # RESTRICTIONS
+    # ===============================
+    restrictions_payload = {
+        "PayloadType": "com.apple.applicationaccess",
+        "PayloadVersion": 1,
+        "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
+        "PayloadUUID": new_uuid(),
+        "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
+        "blacklistedAppBundleIDs": list(all_blocked_apps),
+        "whitelistedAppBundleIDs": always_allowed,
+        "allowSafari": True,
+        "allowScreenTime": False
+    }
+
+    # ===============================
+    # FULL PROFILE
+    # ===============================
+    profile = {
+        "PayloadType": "Configuration",
+        "PayloadVersion": 1,
+        "PayloadUUID": new_uuid(),
+        "PayloadIdentifier": "org.gdistrict.gprotect",
+        "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
         "PayloadOrganization": "GProtect",
-        "PayloadDescription": "This profile enforces parental controls on this device. Apps are overlaid with downtime/blocked pages.",
-        "PayloadRemovalPassword": "220099"
+        "PayloadRemovalDisallowed": True,
+        "PayloadContent": [
+            identity_payload,     # MUST BE FIRST
+            mdm_payload,
+            web_filter_payload,
+            restrictions_payload
+        ] + webclips
     }
 
     plist_data = plistlib.dumps(profile)
@@ -1589,8 +1548,12 @@ def generate_mdm_profile(child_email):
     return Response(
         plist_data,
         mimetype="application/x-apple-aspen-config",
-        headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
+        headers={
+            "Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"
+        }
     )
+
+
 
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
 def update_mdm_profile(child_email):
@@ -4490,6 +4453,7 @@ def api_off_task():
         except:
             pass
         return jsonify({"ok": False}), 500
+
 
 
 # =========================
