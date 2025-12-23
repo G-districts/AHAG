@@ -13,6 +13,7 @@ from image_filter_ai import classify_image as _gschool_classify_image
 import jwt
 from functools import wraps
 import plistlib
+import uuid
 
 # ---------------------------
 # Flask App Initialization
@@ -1221,6 +1222,7 @@ def create_class_session():
     save_data(d)
     return redirect(url_for("teacher_class_page", cid=cid))
 
+
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
     """
@@ -1229,25 +1231,106 @@ def generate_mdm_profile(child_email):
     """
     d = ensure_keys(load_data())
     _ensure_gprotect_structure(d)
-    
+
     if child_email not in d["gprotect"]["children"]:
         return jsonify({"ok": False, "error": "Not registered"}), 403
-    
+
+    # Get child settings
     schedules = d["gprotect"]["schedules"].get(child_email, {})
-    ai_categories = d["gprotect"]["ai_categories"].get(child_email, {})
     manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
     manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
-    
-    # Build blocked apps list
-    blocked_apps = [
-        "com.instagram.ios",
-        "com.snapchat.snapchat",
-        "com.tiktok.tiktokv",
-        "com.facebook.Facebook",
-        "com.twitter.twitter",
-        # Add more based on categories
-    ]
-    
+
+    child_name = child_email.split("@")[0].capitalize()
+
+    # Generate UUIDs
+    def new_uuid():
+        return str(uuid.uuid4()).upper()
+
+    # Build the MDM payload
+    profile = {
+        "PayloadContent": [
+            {
+                "PayloadType": "com.apple.webcontent-filter",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": "org.gdistrict.gprotect.webfilter",
+                "PayloadUUID": new_uuid(),
+                "PayloadDisplayName": f"GProtect Web Filter for {child_name}",
+                "PayloadDescription": "Content filtering controlled by parent",
+                "FilterType": "Plugin",
+                "UserDefinedName": "GProtect Filter",
+                "PluginBundleID": "org.gdistrict.gprotect.filter",
+                "ServerAddress": "https://gschool.gdistrict.org",
+                "Organization": "GProtect",
+                "FilterDataProviderBundleIdentifier": "org.gdistrict.gprotect.dataprovider",
+                "FilterDataProviderDesignatedRequirement": 'identifier "org.gdistrict.gprotect.dataprovider"',
+                "ContentFilterUUID": new_uuid()
+            },
+            {
+                "PayloadType": "com.apple.applicationaccess",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
+                "PayloadUUID": new_uuid(),
+                "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
+                "blacklistedAppBundleIDs": [
+                    "com.instagram.ios",
+                    "com.snapchat.snapchat",
+                    "com.tiktok.tiktokv",
+                    "com.facebook.Facebook",
+                    "com.twitter.twitter"
+                ],
+                "whitelistedAppBundleIDs": ["com.apple.mobilesafari", "com.apple.mobilemail"],
+                "allowSafari": True,
+                "safariAllowAutoFill": False,
+                "safariAllowJavaScript": True,
+                "safariAllowPopups": False,
+                "safariForceFraudWarning": True,
+                "allowExplicitContent": False,
+                "allowBookstore": True,
+                "allowBookstoreErotica": False,
+                "allowGameCenter": False,
+                "allowAddingGameCenterFriends": False,
+                "allowMultiplayerGaming": False,
+                "forceEncryptedBackup": True,
+                "allowDiagnosticSubmission": False,
+                "allowScreenTime": True
+            },
+            {
+                "PayloadType": "com.apple.screentime",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": "org.gdistrict.gprotect.screentime",
+                "PayloadUUID": new_uuid(),
+                "PayloadDisplayName": f"GProtect Screen Time for {child_name}",
+                "familyControlsEnabled": True,
+                "downtimeSchedule": {
+                    "enabled": schedules.get("downtime", {}).get("enabled", True),
+                    "start": {"hour": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[0]),
+                              "minute": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[1])},
+                    "end": {"hour": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[0]),
+                            "minute": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[1])}
+                },
+                "appLimits": {
+                    "application": {
+                        "com.apple.mobilesafari": {"timeLimit": schedules.get("screen_time", {}).get("daily_minutes", 120)*60}
+                    }
+                },
+                "alwaysAllowedBundleIDs": ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
+            }
+        ],
+        "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
+        "PayloadIdentifier": "org.gdistrict.gprotect",
+        "PayloadRemovalDisallowed": True,
+        "PayloadType": "Configuration",
+        "PayloadUUID": new_uuid(),
+        "PayloadVersion": 1,
+        "PayloadOrganization": "GProtect",
+        "PayloadDescription": "This profile enforces parental controls on this device. It cannot be removed without parent permission.",
+        "PayloadRemovalPassword": "PARENT-SET-PASSWORD"
+    }
+
+    plist_data = plistlib.dumps(profile)
+
+    return Response(plist_data, mimetype="application/x-apple-aspen-config",
+                    headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"})    
     # Downtime settings
     downtime = schedules.get("downtime", {})
     downtime_enabled = downtime.get("enabled", False)
