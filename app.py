@@ -3,13 +3,6 @@
 # =========================
 
 from flask import Flask, request, jsonify, render_template, session, redirect, Response, url_for
-return Response(
-    plist_data,
-    mimetype='application/x-apple-aspen-config',
-    headers={
-        'Content-Disposition': f'attachment; filename=GProtect_{child_email}.mobileconfig'
-    }
-)
 from flask_cors import CORS
 import json, os, time, sqlite3, traceback, uuid, re
 from urllib.parse import urlparse
@@ -1439,7 +1432,6 @@ def generate_mdm_profile(child_email):
     plist_data = plistlib.dumps(profile)
     
     # Return as downloadable file
-    from flask import Response
     return Response(
         plist_data,
         mimetype='application/x-apple-aspen-config',
