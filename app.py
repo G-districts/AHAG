@@ -29,6 +29,12 @@ from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
 
+# --- MDM / APNS Certificate Config ---
+APNS_CERT_PATH = "mdm_identity.p12"  # replace with actual path
+APNS_CERT_PASSWORD = "supersecret"           # password you exported the p12 with
+APNS_CERT_UUID = "9507EF8F-DCBB-483E-89DB-298D5471C6C1"  # from your cert
+APNS_TOPIC = "com.gdistrict.gprotect"       # your MDM topic
+
 # ---------------------------
 # Flask App Initialization
 # ---------------------------
@@ -1437,30 +1443,19 @@ def generate_mdm_profile(child_email):
             "PayloadIdentifier": f"org.gdistrict.gprotect.webclip.{child_email}.{app_bundle}",
             "PayloadUUID": new_uuid(),
             "PayloadDisplayName": display_name,
-            "Label": display_name,  # REQUIRED for iOS
+            "Label": display_name,  # REQUIRED
             "PayloadDescription": f"Overlay for {display_name}",
             "IsRemovable": False,
             "Precomposed": True,
             "URL": url
         })
 
-    # --- Embed the certificate payload FIRST ---
-    with open("mdm_identity.p12", "rb") as f:
+    # Encode the .p12 certificate
+    with open(APNS_CERT_PATH, "rb") as f:
         p12_data = base64.b64encode(f.read()).decode("ascii")
-
-    cert_payload_uuid = APNS_CERT_UUID  # Must match IdentityCertificateUUID below
 
     profile = {
         "PayloadContent": [
-            {
-                "PayloadType": "com.apple.security.pkcs12",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.cert.{child_email}",
-                "PayloadUUID": cert_payload_uuid,
-                "PayloadDisplayName": "GProtect MDM Identity",
-                "Password": APNS_CERT_PASSWORD,  # Set this to your .p12 password
-                "PayloadContent": p12_data
-            },
             # --- MDM Payload ---
             {
                 "PayloadType": "com.apple.mdm",
@@ -1471,9 +1466,11 @@ def generate_mdm_profile(child_email):
                 "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
-                "IdentityCertificateUUID": cert_payload_uuid,  # EXACT UUID match
+                "IdentityCertificateUUID": APNS_CERT_UUID,
                 "Topic": APNS_TOPIC,
-                "SignMessage": True
+                "SignMessage": True,
+                "IdentityCertificate": p12_data,
+                "Password": APNS_CERT_PASSWORD
             },
             # --- Web Content Filter ---
             {
@@ -1513,7 +1510,7 @@ def generate_mdm_profile(child_email):
                 "allowSafari": True,
                 "allowScreenTime": False
             }
-        ] + webclips,  # Append Web Clips
+        ] + webclips,
         "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
         "PayloadIdentifier": "org.gdistrict.gprotect",
         "PayloadRemovalDisallowed": True,
@@ -1532,7 +1529,6 @@ def generate_mdm_profile(child_email):
         mimetype="application/x-apple-aspen-config",
         headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
-
 
 
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
