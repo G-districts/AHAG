@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <!-- Web Content Filter -->
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.webcontent-filter</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>org.gdistrict.gprotect.webfilter</string>
+            <key>PayloadUUID</key>
+            <string>GENERATE-UUID-1</string>
+            <key>PayloadDisplayName</key>
+            <string>GProtect Web Filter</string>
+            <key>PayloadDescription</key>
+            <string>Content filtering controlled by parent</string>
+            
+            <key>FilterType</key>
+            <string>Plugin</string>
+            <key>UserDefinedName</key>
+            <string>GProtect Filter</string>
+            <key>PluginBundleID</key>
+            <string>org.gdistrict.gprotect.filter</string>
+            <key>ServerAddress</key>
+            <string>https://gschool.gdistrict.org</string>
+            <key>Organization</key>
+            <string>GProtect</string>
+            
+            <!-- Filter data - this will be fetched from server -->
+            <key>FilterDataProviderBundleIdentifier</key>
+            <string>org.gdistrict.gprotect.dataprovider</string>
+            <key>FilterDataProviderDesignatedRequirement</key>
+            <string>identifier "org.gdistrict.gprotect.dataprovider"</string>
+        </dict>
+        
+        <!-- Restrictions Payload -->
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.applicationaccess</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>org.gdistrict.gprotect.restrictions</string>
+            <key>PayloadUUID</key>
+            <string>GENERATE-UUID-2</string>
+            <key>PayloadDisplayName</key>
+            <string>GProtect Restrictions</string>
+            
+            <!-- App Restrictions -->
+            <key>blacklistedAppBundleIDs</key>
+            <array>
+                <!-- Dynamically populated from server -->
+            </array>
+            
+            <key>whitelistedAppBundleIDs</key>
+            <array>
+                <string>com.apple.mobilesafari</string>
+                <string>com.apple.mobilemail</string>
+                <!-- More allowed apps -->
+            </array>
+            
+            <!-- Safari Restrictions -->
+            <key>allowSafari</key>
+            <true/>
+            <key>safariAllowAutoFill</key>
+            <false/>
+            <key>safariAllowJavaScript</key>
+            <true/>
+            <key>safariAllowPopups</key>
+            <false/>
+            <key>safariForceFraudWarning</key>
+            <true/>
+            
+            <!-- Content Restrictions -->
+            <key>allowExplicitContent</key>
+            <false/>
+            <key>allowBookstore</key>
+            <true/>
+            <key>allowBookstoreErotica</key>
+            <false/>
+            
+            <!-- Social & Gaming -->
+            <key>allowGameCenter</key>
+            <false/>
+            <key>allowAddingGameCenterFriends</key>
+            <false/>
+            <key>allowMultiplayerGaming</key>
+            <false/>
+            
+            <!-- Privacy -->
+            <key>forceEncryptedBackup</key>
+            <true/>
+            <key>allowDiagnosticSubmission</key>
+            <false/>
+            
+            <!-- Screen Time -->
+            <key>allowScreenTime</key>
+            <true/>
+        </dict>
+        
+        <!-- Screen Time Payload -->
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.screentime</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>org.gdistrict.gprotect.screentime</string>
+            <key>PayloadUUID</key>
+            <string>GENERATE-UUID-3</string>
+            <key>PayloadDisplayName</key>
+            <string>GProtect Screen Time</string>
+            
+            <!-- Downtime Schedule -->
+            <key>familyControlsEnabled</key>
+            <true/>
+            <key>downtimeSchedule</key>
+            <dict>
+                <key>enabled</key>
+                <true/>
+                <key>start</key>
+                <dict>
+                    <key>hour</key>
+                    <integer>21</integer>
+                    <key>minute</key>
+                    <integer>0</integer>
+                </dict>
+                <key>end</key>
+                <dict>
+                    <key>hour</key>
+                    <integer>7</integer>
+                    <key>minute</key>
+                    <integer>0</integer>
+                </dict>
+            </dict>
+            
+            <!-- App Limits -->
+            <key>appLimits</key>
+            <dict>
+                <key>application</key>
+                <dict>
+                    <key>com.apple.mobilesafari</key>
+                    <dict>
+                        <key>timeLimit</key>
+                        <integer>7200</integer> <!-- 2 hours in seconds -->
+                    </dict>
+                </dict>
+            </dict>
+            
+            <!-- Always Allowed -->
+            <key>alwaysAllowedBundleIDs</key>
+            <array>
+                <string>com.apple.mobilephone</string>
+                <string>com.apple.FaceTime</string>
+                <string>com.apple.MobileSMS</string>
+            </array>
+        </dict>
+        
+        <!-- VPN Configuration (for content filtering) -->
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.vpn.managed</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>org.gdistrict.gprotect.vpn</string>
+            <key>PayloadUUID</key>
+            <string>GENERATE-UUID-4</string>
+            <key>PayloadDisplayName</key>
+            <string>GProtect Filter VPN</string>
+            
+            <key>UserDefinedName</key>
+            <string>GProtect Content Filter</string>
+            <key>VPNType</key>
+            <string>IKEv2</string>
+            <key>IKEv2</key>
+            <dict>
+                <key>RemoteAddress</key>
+                <string>vpn.gdistrict.org</string>
+                <key>RemoteIdentifier</key>
+                <string>vpn.gdistrict.org</string>
+                <key>LocalIdentifier</key>
+                <string>gprotect</string>
+                
+                <key>AuthenticationMethod</key>
+                <string>SharedSecret</string>
+                <key>SharedSecret</key>
+                <data>BASE64-ENCODED-SECRET</data>
+                
+                <key>ExtendedAuthEnabled</key>
+                <integer>1</integer>
+                <key>AuthName</key>
+                <string>gprotect</string>
+                <key>AuthPassword</key>
+                <string>DEVICE-SPECIFIC-PASSWORD</string>
+            </dict>
+            
+            <key>OnDemandEnabled</key>
+            <integer>1</integer>
+            <key>OnDemandRules</key>
+            <array>
+                <dict>
+                    <key>Action</key>
+                    <string>Connect</string>
+                </dict>
+            </array>
+        </dict>
+    </array>
+    
+    <!-- Root Payload Settings -->
+    <key>PayloadDisplayName</key>
+    <string>GProtect Parental Controls</string>
+    <key>PayloadIdentifier</key>
+    <string>org.gdistrict.gprotect</string>
+    <key>PayloadRemovalDisallowed</key>
+    <true/>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>GENERATE-ROOT-UUID</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadOrganization</key>
+    <string>GProtect</string>
+    <key>PayloadDescription</key>
+    <string>This profile enforces parental controls on this device. It cannot be removed without parent permission.</string>
+    
+    <!-- Removal Password -->
+    <key>PayloadRemovalPassword</key>
+    <string>PARENT-SET-PASSWORD</string>
+</dict>
+</plist>
