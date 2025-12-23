@@ -4406,8 +4406,7 @@ def api_off_task():
         d.setdefault("pending_commands", {}).setdefault("*", []).append({
             "type": "notify",
             "title": "Off-task detected",
-            "message": f"{student or 'St
-udent'} visited a blocked page."
+            "message": f"{student or 'Student'} visited a blocked page."
         })
         save_data(d)
         return jsonify({"ok": True})
