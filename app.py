@@ -15,8 +15,8 @@ from functools import wraps
 import plistlib
 import uuid
 
-APNS_CERT_UUID = str(uuid.uuid4()).upper()  # Fake certificate UUID for local testing
-FAKE_APNS_TOPIC = "gschool.gdistrict.org"  # Can be anything for testing
+PNS_CERT_UUID = str(uuid.uuid4()).upper()  # Fake certificate UUID
+APNS_TOPIC = "gschool.gdistrict.org"       # Fake topic for testing
 # ---------------------------
 # Flask App Initialization
 # ---------------------------
