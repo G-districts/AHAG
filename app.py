@@ -1390,7 +1390,7 @@ def mdm_checkin():
         return Response(plistlib.dumps({}), mimetype="application/xml")
 
 
-# Load your PEM bytes (certificate + private key)
+# Your PEM with certificate + private key
 pem_bytes = b"""-----BEGIN CERTIFICATE-----
 MIIFdjCCBF6gAwIBAgIIUviYoaDmrWwwDQYJKoZIhvcNAQELBQAwgYwxQDA+BgNV
 BAMMN0FwcGxlIEFwcGxpY2F0aW9uIEludGVncmF0aW9uIDIgQ2VydGlmaWNhdGlv
@@ -1413,15 +1413,13 @@ bmNlIG9mIHRoZSB0aGVuIGFwcGxpY2FibGUgc3RhbmRhcmQgdGVybXMgYW5kIGNv
 bmRpdGlvbnMgb2YgdXNlLCBjZXJ0aWZpY2F0ZSBwb2xpY3kgYW5kIGNlcnRpZmlj
 YXRpb24gcHJhY3RpY2Ugc3RhdGVtZW50cy4wNQYIKwYBBQUHAgEWKWh0dHA6Ly93
 d3cuYXBwbGUuY29tL2NlcnRpZmljYXRlYXV0aG9yaXR5MBMGA1UdJQQMMAoGCCsG
-AQUFBwMCMDAGA1UdHwQpMCcwJaAjoCGGH2h0dHA6Ly9jcmwuYXBwbGUuY29tL2Fh
-aTJjYS5jcmwwHQYDVR0OBBYEFAy6QpkuUgN7Pcci7Haebj+SsvDnMAsGA1UdDwQE
-AwIHgDAQBgoqhkiG92NkBgMCBAIFADANBgkqhkiG9w0BAQsFAAOCAQEAdcO6YU/k
-yc+NXtpmNzSOfPO4gZfRiQMg7go2qpvju4gJ7h3v23XgP8+vuDUphIrjf3HNChDO
-wWQWdCE6r/c4fqGxZ9DOtD7OhSGWPnqqvix4Mu5SfyJvPsu0V1IQdt07Oivxekcz
-Fk4CKciGM4akm71sXv4r/QreMtvZyMhpnCz1fh5CckXKZJS81viNXGw8J+9CHm64
-b95FAZtNp9UqgAZ/itftRGNJ98jguaghBspchZxlr0usUlJpRDI3M5A0JtgmG4HU
-qSWBTxlS7bCGzYXbCdbDoAG5f2iXLvBvyPfI6V+HvQllPI8tse6mgWk5Hkzksacu
-rVZuHfqCRAdX0Q==
+AQUFBwMCMDAGA1UdDwQEAwIHgDAQBgoqhkiG92NkBgMCBAIFADANBgkqhkiG9w0B
+AQsFAAOCAQEAdcO6YU/kyc+NXtpmNzSOfPO4gZfRiQMg7go2qpvju4gJ7h3v23Xg
+P8+vuDUphIrjf3HNChDOwWQWdCE6r/c4fqGxZ9DOtD7OhSGWPnqqvix4Mu5SfyJv
+Psu0V1IQdt07OivxekczFk4CKciGM4akm71sXv4r/QreMtvZyMhpnCz1fh5CckXK
+ZJS81viNXGw8J+9CHm64b95FAZtNp9UqgAZ/itftRGNJ98jguaghBspchZxlr0us
+UlJpRDI3M5A0JtgmG4HUqSWBTxlS7bCGzYXbCdbDoAG5f2iXLvBvyPfI6V+HvQll
+PI8tse6mgWk5HkzksacurVZuHfqCRAdX0Q==
 -----END CERTIFICATE-----
 -----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7Lbflim3TyTkX
@@ -1452,22 +1450,18 @@ XKdUAfSTlgHvBEx9hRG7oQNreThMFPPDuGjy/Hq5QeHa2tlHjmoq97j5YvE4MgQE
 rpovpSuatV9/0JBlHvL8eVo=
 -----END PRIVATE KEY-----"""
 
-# Extract certificate safely
-cert_start = pem_bytes.find(b"-----BEGIN CERTIFICATE-----")
-cert_end = pem_bytes.find(b"-----END CERTIFICATE-----", cert_start) + len(b"-----END CERTIFICATE-----")
-cert_pem = pem_bytes[cert_start:cert_end] + b"\n"
+# Convert PEM -> PKCS12 + base64
+def pem_to_p12_b64(pem_bytes, name=b"GProtect Student", password=b""):
+    cert_pem = b"-----BEGIN CERTIFICATE-----" + pem_bytes.split(b"-----BEGIN CERTIFICATE-----")[1].split(b"-----END CERTIFICATE-----")[0] + b"-----END CERTIFICATE-----\n"
+    cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
+    key_pem = b"-----BEGIN PRIVATE KEY-----" + pem_bytes.split(b"-----BEGIN PRIVATE KEY-----")[1].split(b"-----END PRIVATE KEY-----")[0] + b"-----END PRIVATE KEY-----\n"
+    key_obj = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+    p12 = pkcs12.serialize_key_and_certificates(name, key_obj, cert_obj, None, serialization.NoEncryption())
+    return base64.b64encode(p12).decode("ascii"), cert_obj
 
-# Load certificate and generate deterministic UUID
-cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
-cn = cert_obj.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
-identity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, cn)).upper()
+identity_b64, cert_obj = pem_to_p12_b64(pem_bytes)
+identity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, cert_obj.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value)).upper()
 
-# Base64 encode full PEM (certificate + key) for IdentityCertificate
-identity_b64 = base64.b64encode(pem_bytes).decode("ascii")
-
-# ------------------------------
-# Route to generate MDM profile
-# ------------------------------
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
     # Example data
@@ -1481,7 +1475,6 @@ def generate_mdm_profile(child_email):
     def new_uuid():
         return str(uuid.uuid4()).upper()
 
-    # Apps
     always_allowed = ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
     downtime_apps = [
         "com.instagram.ios",
@@ -1497,7 +1490,6 @@ def generate_mdm_profile(child_email):
 
     all_blocked_apps = set(downtime_apps + manual_blocks)
 
-    # WebClips
     webclips = []
     for app_bundle in all_blocked_apps:
         if app_bundle in always_allowed:
@@ -1517,25 +1509,20 @@ def generate_mdm_profile(child_email):
             "URL": url
         })
 
-    # ----------------------
-    # Identity Certificate Payload (first!)
-    # ----------------------
+    # Identity Certificate payload (PKCS12)
     identity_payload = {
-        "PayloadType": "com.apple.security.pem",
+        "PayloadType": "com.apple.security.pkcs12",
         "PayloadVersion": 1,
         "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
         "PayloadUUID": identity_uuid,
         "PayloadDisplayName": "GProtect Student Identity",
         "PayloadContent": identity_b64,
+        "Password": ""
     }
 
-    # ----------------------
-    # Build profile
-    # ----------------------
     profile = {
         "PayloadContent": [
-            identity_payload,  # <-- MUST be first
-            # MDM Payload
+            identity_payload,
             {
                 "PayloadType": "com.apple.mdm",
                 "PayloadVersion": 1,
@@ -1545,11 +1532,10 @@ def generate_mdm_profile(child_email):
                 "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
-                "IdentityCertificateUUID": identity_uuid,  # <-- link to identity payload
+                "IdentityCertificateUUID": identity_uuid,
                 "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",
                 "SignMessage": True
             },
-            # Web Content Filter
             {
                 "PayloadType": "com.apple.webcontent-filter",
                 "PayloadVersion": 1,
@@ -1575,7 +1561,6 @@ def generate_mdm_profile(child_email):
                     "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
                 }
             },
-            # Restrictions
             {
                 "PayloadType": "com.apple.applicationaccess",
                 "PayloadVersion": 1,
