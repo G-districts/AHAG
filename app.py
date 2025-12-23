@@ -28,7 +28,8 @@ import plistlib
 from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
-
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 
 # ---------------------------
 # Flask App Initialization
@@ -74,6 +75,139 @@ def load_certificate_base64():
 
 APNS_CERT_B64 = load_certificate_base64()
 
+def get_cert_uuid(pem_cert_bytes: bytes) -> str:
+    """
+    Generates a deterministic UUID for the certificate from its subject CN.
+    """
+    cert = x509.load_pem_x509_certificate(pem_cert_bytes, default_backend())
+    cn = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+    # Use UUID5 (namespace DNS) for deterministic UUID
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, cn)).upper()
+
+import plistlib
+import uuid
+import base64
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+
+# ===============================
+# Your PEM file (certificate + key)
+# ===============================
+pem_bytes = b"""-----BEGIN CERTIFICATE-----
+MIIFdjCCBF6gAwIBAgIIUviYoaDmrWwwDQYJKoZIhvcNAQELBQAwgYwxQDA+BgNV
+BAMMN0FwcGxlIEFwcGxpY2F0aW9uIEludGVncmF0aW9uIDIgQ2VydGlmaWNhdGlv
+biBBdXRob3JpdHkxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9y
+aXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzAeFw0yNTEyMjMw
+NjM1MTBaFw0yNjEyMjMwNjM1MDlaMIGPMUwwSgYKCZImiZPyLGQBAQw8Y29tLmFw
+cGxlLm1nbXQuRXh0ZXJuYWwuOTUwN2VmOGYtZGNiYi00ODNlLTg5ZGItMjk4ZDU0
+NzFjNmMxMTIwMAYDVQQDDClBUFNQOjk1MDdlZjhmLWRjYmItNDgzZS04OWRiLTI5
+OGQ1NDcxYzZjMTELMAkGA1UEBhMCVVMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
+ggEKAoIBAQC7Lbflim3TyTkXq4dz6KlYwamQJjtaCRvS6RzEaJaZTw4cDURtvhvf
+c/JRD3YApOUfOWvobQ5+qYoNwksxB6uwAWksboZ74dVIzqFb1ga441DjAgiREfAN
+TmHUB/N77cPbz9DQCBb4LZwZzHPyInss016MRhmMWyZ4GwQ7VerOedRzvblZJFS5
+HiTeMkKIggHyG/AlS47wneVNXT7n6QYqosJTci68HhNaj5Gr/j2F1BFEZktB9AvB
+cYm5bjSW2wGxpi3pdnV1vesu0sfUUGFmivU2EL9m1ZRj5pzrPdyrD6AlPqgg0p+v
+VsnH8Oe52YdMUm3igQ+Y+pm404JCrRgnAgMBAAGjggHVMIIB0TAJBgNVHRMEAjAA
+MB8GA1UdIwQYMBaAFPe+fCFgkds9G3vYOjKBad+ebH+bMIIBHAYDVR0gBIIBEzCC
+AQ8wggELBgkqhkiG92NkBQEwgf0wgcMGCCsGAQUFBwICMIG2DIGzUmVsaWFuY2Ug
+b24gdGhpcyBjZXJ0aWZpY2F0ZSBieSBhbnkgcGFydHkgYXNzdW1lcyBhY2NlcHRh
+bmNlIG9mIHRoZSB0aGVuIGFwcGxpY2FibGUgc3RhbmRhcmQgdGVybXMgYW5kIGNv
+bmRpdGlvbnMgb2YgdXNlLCBjZXJ0aWZpY2F0ZSBwb2xpY3kgYW5kIGNlcnRpZmlj
+YXRpb24gcHJhY3RpY2Ugc3RhdGVtZW50cy4wNQYIKwYBBQUHAgEWKWh0dHA6Ly93
+d3cuYXBwbGUuY29tL2NlcnRpZmljYXRlYXV0aG9yaXR5MBMGA1UdJQQMMAoGCCsG
+AQUFBwMCMDAGA1UdHwQpMCcwJaAjoCGGH2h0dHA6Ly9jcmwuYXBwbGUuY29tL2Fh
+aTJjYS5jcmwwHQYDVR0OBBYEFAy6QpkuUgN7Pcci7Haebj+SsvDnMAsGA1UdDwQE
+AwIHgDAQBgoqhkiG92NkBgMCBAIFADANBgkqhkiG9w0BAQsFAAOCAQEAdcO6YU/k
+yc+NXtpmNzSOfPO4gZfRiQMg7go2qpvju4gJ7h3v23XgP8+vuDUphIrjf3HNChDO
+wWQWdCE6r/c4fqGxZ9DOtD7OhSGWPnqqvix4Mu5SfyJvPsu0V1IQdt07Oivxekcz
+Fk4CKciGM4akm71sXv4r/QreMtvZyMhpnCz1fh5CckXKZJS81viNXGw8J+9CHm64
+b95FAZtNp9UqgAZ/itftRGNJ98jguaghBspchZxlr0usUlJpRDI3M5A0JtgmG4HU
+qSWBTxlS7bCGzYXbCdbDoAG5f2iXLvBvyPfI6V+HvQllPI8tse6mgWk5Hkzksacu
+rVZuHfqCRAdX0Q==
+-----END CERTIFICATE-----
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7Lbflim3TyTkX
+q4dz6KlYwamQJjtaCRvS6RzEaJaZTw4cDURtvhvfc/JRD3YApOUfOWvobQ5+qYoN
+wksxB6uwAWksboZ74dVIzqFb1ga441DjAgiREfANTmHUB/N77cPbz9DQCBb4LZwZ
+zHPyInss016MRhmMWyZ4GwQ7VerOedRzvblZJFS5HiTeMkKIggHyG/AlS47wneVN
+XT7n6QYqosJTci68HhNaj5Gr/j2F1BFEZktB9AvBcYm5bjSW2wGxpi3pdnV1vesu
+0sfUUGFmivU2EL9m1ZRj5pzrPdyrD6AlPqgg0p+vVsnH8Oe52YdMUm3igQ+Y+pm4
+04JCrRgnAgMBAAECggEAN4cekPf6EOQXDdCTBG23H1+EYAEXhmRBXtZM9G9ajeyH
+8QZ2kF/fgPCyqB2AEjzYw+STAIap0CWXkPFcwRTXeAVTIB1BxCqAzXKPJ+FcaSj2
+bAHEbNT3c9sW5oHdV5x3iBQkjDJ6LfHJ51Vh6CkWhXvHBrIdDihURzksjjW0zL+R
+QgzbE92pNxIqntJGFy0ZzOnQzVh1ZWlPAUh0SUqgoJH1pg7sA3hk2zRONS/B1pca
+QHchibl3yGMqaLcxmBqlXaKavbhEsZ5AXYpEcTJA/pBET7qzaIZUWGB/ZGkXSe98
+RebbICSUVPEcTjWqGp8q0l46pR7AniArCNrAgSkQwQKBgQDIGstXwnFJA+tdriYA
+OHg3omuSZxMmQj9Xp7FN9yYRdCjuJoL1HaTxEkpYrRnGuLo3oTJh/Il9oER5HoFd
+TdXZJt7iKdoZKEeQjqMwo8yHkOcXpbUibEmsjhe0+kKSrngDUviodsfjgYxbSglI
+LFaJ6rt7hse/hzhCNuywGHQwtwKBgQDvdpkk7iW4I1afrC2WOO1PP7Vz2VQacTy1
+KvV5MyOvOdoojUJqYsRXdRpo+/hBGZ4KGV/4HNj09/ncEaW7q1nU33iuhpvvCo9E
+UqynjOobL8RuFsiLh2obT2/yLHBnT2Di4T43ZtbtqwvN6VnVOB4ikm0+18t1+tZr
+giQ3NmUEEQKBgQCEFHuHr8aKxVWD/kEDAEMJpeGPPw36wNuChiOYLLwp5RxnJXBn
+Tmvi24nLQmazLpdrxLC20LQIAdNwhtwotAmlTezsJ2fYFyg1mJDKuDN2gASpLS2E
+TSnMBfZL9KwgmZyJxShwOgbyej4ku5eo1etBGXkqreoG18AgpJRSH7IBvQKBgBLz
+3Q0aOCwJx/pdQ0JngQjLrw3bPpfVLIveOY19Ka7dslGRVJdc99NANnXms3BbmbGM
+7paRme5RjhoH34kp97MseL2/c6oIuOwcawPb2E+MiUx5SygX8KL2t5KAR+k1VCLA
+1w7Fee9XoViLxotkpKXx1umpZLYSw1PA+iLQkFAxAoGAK1Q96Zz5GLrX+dDi8Gti
+GA79WwpbgS8+i7rMR+xWnmNzNt+nHTtiVxsvxPdZnMtOq5vFSImW8Ufg1uUGUf8V
+XKdUAfSTlgHvBEx9hRG7oQNreThMFPPDuGjy/Hq5QeHa2tlHjmoq97j5YvE4MgQE
+rpovpSuatV9/0JBlHvL8eVo=
+-----END PRIVATE KEY-----"""
+
+# Split certificate and key
+cert_pem = b"\n".join(pem_bytes.split(b"-----END CERTIFICATE-----")[:2]) + b"-----END CERTIFICATE-----\n"
+
+# Generate deterministic UUID from certificate CN
+cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
+cn = cert_obj.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+identity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, cn)).upper()
+
+# Base64 encode the full PEM for the IdentityCertificate payload
+identity_b64 = base64.b64encode(pem_bytes).decode('ascii')
+
+# IdentityCertificate payload
+identity_payload = {
+    "PayloadType": "com.apple.security.pem",
+    "PayloadVersion": 1,
+    "PayloadIdentifier": "org.gdistrict.gprotect.identity",
+    "PayloadUUID": str(uuid.uuid4()).upper(),
+    "PayloadDisplayName": "GProtect Student Identity",
+    "PayloadContent": identity_b64,
+}
+
+# MDM payload
+mdm_payload = {
+    "PayloadType": "com.apple.mdm",
+    "PayloadVersion": 1,
+    "PayloadIdentifier": "org.gdistrict.gprotect.mdm.student",
+    "PayloadUUID": str(uuid.uuid4()).upper(),
+    "PayloadDisplayName": "GProtect MDM for Student",
+    "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
+    "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
+    "AccessRights": 8191,
+    "IdentityCertificateUUID": identity_uuid,
+    "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",
+    "SignMessage": True,
+}
+
+# Full mobileconfig
+mobileconfig = {
+    "PayloadContent": [identity_payload, mdm_payload],
+    "PayloadType": "Configuration",
+    "PayloadVersion": 1,
+    "PayloadIdentifier": "org.gdistrict.gprotect.mdm",
+    "PayloadUUID": str(uuid.uuid4()).upper(),
+    "PayloadDisplayName": "GProtect Student Enrollment",
+    "PayloadDescription": "Enrolls the device in GProtect MDM with identity certificate.",
+    "PayloadOrganization": "GDistrict",
+}
+
+# Write to .mobileconfig
+with open("GProtectStudent.mobileconfig", "wb") as f:
+    plistlib.dump(mobileconfig, f)
+
+print("✅ GProtectStudent.mobileconfig created successfully!")
+print("IdentityCertificateUUID:", identity_uuid)
 
 # =========================
 # Helpers: Data & Database
