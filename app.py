@@ -29,23 +29,20 @@ from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
 
-# Load your PKCS12 file
-with open("mdm_identity.p12", "rb") as f:
+# --- Load your APNS certificate from P12 ---
+P12_PATH = "mdm_identity.p12"
+P12_PASSWORD = b"supersecret"  # password as bytes
+
+with open(P12_PATH, "rb") as f:
     p12_data = f.read()
 
-p12 = crypto.load_pkcs12(p12_data, b"supersecret")  # password as bytes
-cert = crypto.dump_certificate(crypto.FILETYPE_PEM, p12.get_certificate())
-key = crypto.dump_privatekey(crypto.FILETYPE_PEM, p12.get_privatekey())
+p12 = crypto.load_pkcs12(p12_data, P12_PASSWORD)
+cert = p12.get_certificate()
 
-APNS_CERT = "mdm_push.pem"  # now in root
+# Generate a UUID from certificate CN (or use fixed if you prefer)
+APNS_CERT_UUID = str(uuid.uuid5(uuid.NAMESPACE_DNS, cert.get_subject().CN)).upper()
 APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
-APNS_CERT_UUID = "9507ef8f-dcbb-483e-89db-298d5471c6c1"  # match your APNS_TOPIC suffix
 
-apns_client = APNsClient(
-    APNS_CERT,
-    use_sandbox=False,  # True if testing on development devices
-    use_alternative_port=False
-)
 # ---------------------------
 # Flask App Initialization
 # ---------------------------
@@ -1363,8 +1360,31 @@ def mdm_checkin():
         return Response(plistlib.dumps({}), mimetype="application/xml")
 
 
+import uuid
+import plistlib
+from flask import Flask, jsonify, Response
+from OpenSSL import crypto
+
+app = Flask(__name__)
+
+# --- Load your APNS certificate from P12 ---
+P12_PATH = "mdm_identity.p12"
+P12_PASSWORD = b"supersecret"  # password as bytes
+
+with open(P12_PATH, "rb") as f:
+    p12_data = f.read()
+
+p12 = crypto.load_pkcs12(p12_data, P12_PASSWORD)
+cert = p12.get_certificate()
+
+# Generate a UUID from certificate CN (or use fixed if you prefer)
+APNS_CERT_UUID = str(uuid.uuid5(uuid.NAMESPACE_DNS, cert.get_subject().CN)).upper()
+APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
+
+
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
+    # Replace with your actual data loading functions
     d = ensure_keys(load_data())
     _ensure_gprotect_structure(d)
 
@@ -1483,7 +1503,7 @@ def generate_mdm_profile(child_email):
         "PayloadVersion": 1,
         "PayloadOrganization": "GProtect",
         "PayloadDescription": "This profile enforces parental controls on this device. It cannot be removed without parent permission.",
-        "PayloadRemovalPassword": "PARENT-SET-PASSWORD"
+        "PayloadRemovalPassword": "220099"
     }
 
     plist_data = plistlib.dumps(profile)
@@ -1493,6 +1513,7 @@ def generate_mdm_profile(child_email):
         mimetype="application/x-apple-aspen-config",
         headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
+
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
 def update_mdm_profile(child_email):
     d = ensure_keys(load_data())
