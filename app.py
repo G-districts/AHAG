@@ -107,40 +107,9 @@ identity_payload = {
 # ===============================
 # MDM payload
 # ===============================
-mdm_payload = {
-    "PayloadType": "com.apple.mdm",
-    "PayloadVersion": 1,
-    "PayloadIdentifier": "org.gdistrict.gprotect.mdm.student",
-    "PayloadUUID": str(uuid.uuid4()).upper(),
-    "PayloadDisplayName": "GProtect MDM for Student",
-    "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
-    "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
-    "AccessRights": 8191,
-    "IdentityCertificateUUID": identity_uuid,
-    "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",
-    "SignMessage": True,
-}
 
-# ===============================
-# Full mobileconfig
-# ===============================
-mobileconfig = {
-    "PayloadContent": [identity_payload, mdm_payload],
-    "PayloadType": "Configuration",
-    "PayloadVersion": 1,
-    "PayloadIdentifier": "org.gdistrict.gprotect.mdm",
-    "PayloadUUID": str(uuid.uuid4()).upper(),
-    "PayloadDisplayName": "GProtect Student Enrollment",
-    "PayloadDescription": "Enrolls the device in GProtect MDM with identity certificate.",
-    "PayloadOrganization": "GDistrict",
-}
 
-# Write to .mobileconfig
-with open("GProtectStudent.mobileconfig", "wb") as f:
-    plistlib.dump(mobileconfig, f)
 
-print("✅ GProtectStudent.mobileconfig created successfully!")
-print("IdentityCertificateUUID:", identity_uuid)
 # =========================
 # Helpers: Data & Database
 # =========================
@@ -1420,6 +1389,27 @@ def mdm_checkin():
         print("MDM checkin error:", e)
         return Response(plistlib.dumps({}), mimetype="application/xml")
 
+# Load your PEM bytes (certificate + private key)
+pem_bytes = b"""-----BEGIN CERTIFICATE-----
+MIIFdjCCBF6gAwIBAgIIUviYoaDmrWwwDQYJKoZIhvcNAQELBQAwgYwxQDA+BgNV
+BAMMN0FwcGxlIEFwcGxpY2F0aW9uIEludGVncmF0aW9uIDIgQ2VydGlmaWNhdGlv
+...
+-----END PRIVATE KEY-----"""
+
+# Extract certificate only
+cert_pem = b"\n".join(pem_bytes.split(b"-----END CERTIFICATE-----")[:1]) + b"\n-----END CERTIFICATE-----\n"
+
+# Load certificate and get CN
+cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
+cn = cert_obj.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+
+# Generate deterministic UUID for IdentityCertificate
+identity_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, cn)).upper()
+
+# Base64 encode the full PEM (cert + key)
+identity_b64 = base64.b64encode(pem_bytes).decode("ascii")
+
+
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
     # Example data structure, replace with your actual data handling
@@ -1471,6 +1461,15 @@ def generate_mdm_profile(child_email):
 
     profile = {
         "PayloadContent": [
+            # Identity Certificate Payload
+            {
+                "PayloadType": "com.apple.security.pem",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
+                "PayloadUUID": identity_uuid,
+                "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
+                "PayloadContent": identity_b64,
+            },
             # MDM Payload
             {
                 "PayloadType": "com.apple.mdm",
@@ -1481,15 +1480,15 @@ def generate_mdm_profile(child_email):
                 "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
-                "IdentityCertificate": identity_b64,
-                "Topic": "YOUR_APNS_TOPIC",  # Replace with your APNS topic
+                "IdentityCertificateUUID": identity_uuid,  # MUST match identity_payload UUID
+                "Topic": "YOUR_APNS_TOPIC",
                 "SignMessage": True
             },
             # Web Content Filter (example)
             {
                 "PayloadType": "com.apple.webcontent-filter",
                 "PayloadVersion": 1,
-                "PayloadIdentifier": "org.gdistrict.gprotect.webfilter",
+                "PayloadIdentifier": f"org.gdistrict.gprotect.webfilter.{child_email}",
                 "PayloadUUID": new_uuid(),
                 "PayloadDisplayName": f"GProtect Web Filter for {child_name}",
                 "PayloadDescription": "Content filtering controlled by parent",
@@ -1515,7 +1514,7 @@ def generate_mdm_profile(child_email):
             {
                 "PayloadType": "com.apple.applicationaccess",
                 "PayloadVersion": 1,
-                "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
+                "PayloadIdentifier": f"org.gdistrict.gprotect.restrictions.{child_email}",
                 "PayloadUUID": new_uuid(),
                 "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
                 "blacklistedAppBundleIDs": list(all_blocked_apps),
@@ -1542,7 +1541,6 @@ def generate_mdm_profile(child_email):
         mimetype="application/x-apple-aspen-config",
         headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
-
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
 def update_mdm_profile(child_email):
     d = ensure_keys(load_data())
