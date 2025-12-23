@@ -1,6 +1,8 @@
 import sys
 import collections
 from OpenSSL import crypto
+import uuid
+import os
 
 # =========================
 # Patch collections for hyper/apns2 compatibility
@@ -12,20 +14,17 @@ if sys.version_info >= (3, 3):
     collections.MutableSet = collections.abc.MutableSet
     collections.MutableMapping = collections.abc.MutableMapping
 
-# Now import everything else
+# =========================
+# Standard imports
+# =========================
 from flask import Flask, request, jsonify, render_template, session, redirect, Response, url_for
 from flask_cors import CORS
-import json, os, time, sqlite3, traceback, uuid, re
-from urllib.parse import urlparse
-import random, time, hashlib
+import json, time, sqlite3, traceback, re, random, hashlib
 from datetime import datetime, time as dt_time
 from collections import defaultdict
-from image_filter_ai import classify_image as _gschool_classify_image
-import jwt
 from functools import wraps
 import plistlib
 from apns_mdm import send_mdm_push
-
 from apns2.client import APNsClient
 from apns2.payload import Payload
 
@@ -43,11 +42,11 @@ try:
 except Exception as e:
     print("[WARN] Failed to register AI blueprint:", e)
 
-
+# =========================
+# ICE servers helper
+# =========================
 def _ice_servers():
-    # Always include Google STUN
     servers = [{"urls": ["stun:stun.l.google.com:19302"]}]
-    # Optional TURN from env
     turn_url = os.environ.get("TURN_URL")
     turn_user = os.environ.get("TURN_USER")
     turn_pass = os.environ.get("TURN_PASS")
@@ -59,21 +58,25 @@ def _ice_servers():
         })
     return servers
 
-
+# =========================
+# Paths
+# =========================
 ROOT = os.path.dirname(__file__)
 DATA_PATH = os.path.join(ROOT, "data.json")
 DB_PATH = os.path.join(ROOT, "gschool.db")
 SCENES_PATH = os.path.join(ROOT, "scenes.json")
 
-
 # =========================
-# Helpers: Data & Database
+# Load APNS Certificate Safely
 # =========================
-
-def load_apns_cert():
-    from OpenSSL import crypto
-    P12_PATH = "mdm_identity.p12"
+def get_apns_cert_uuid():
+    """Returns a valid APNS certificate UUID or fallback."""
+    P12_PATH = os.path.join(ROOT, "mdm_identity.p12")
     P12_PASSWORD = b"supersecret"
+
+    if not os.path.exists(P12_PATH):
+        print("[WARN] APNS P12 file not found at", P12_PATH)
+        return "00000000-0000-0000-0000-000000000000"  # fallback dummy UUID
 
     try:
         with open(P12_PATH, "rb") as f:
@@ -84,11 +87,28 @@ def load_apns_cert():
         return uuid_val
     except Exception as e:
         print("[WARN] Failed to load APNS certificate:", e)
-        return None
+        return "00000000-0000-0000-0000-000000000000"  # fallback dummy UUID
 
-APNS_CERT_UUID = load_apns_cert()
+# These can be reused anywhere in the app
+APNS_CERT_UUID = get_apns_cert_uuid()
 APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
 
+# Optional: initialize APNs client lazily (on first push)
+apns_client = None
+def get_apns_client():
+    global apns_client
+    if apns_client is None:
+        try:
+            apns_client = APNsClient(
+                os.path.join(ROOT, "mdm_identity.p12"),
+                use_sandbox=False,
+                use_alternative_port=False
+            )
+        except Exception as e:
+            print("[WARN] Failed to initialize APNs client:", e)
+            apns_client = None
+    return apns_client
+# helpers==================================================================
 
 
 def _clean_expired_bypass_codes(settings):
