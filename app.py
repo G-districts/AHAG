@@ -1391,7 +1391,6 @@ def mdm_checkin():
 
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
-    # Replace with your actual data loading functions
     d = ensure_keys(load_data())
     _ensure_gprotect_structure(d)
 
@@ -1406,6 +1405,44 @@ def generate_mdm_profile(child_email):
 
     def new_uuid():
         return str(uuid.uuid4()).upper()
+
+    # Always allowed apps
+    always_allowed = ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
+
+    # Apps that are subject to downtime
+    downtime_apps = [
+        "com.instagram.ios",
+        "com.snapchat.snapchat",
+        "com.tiktok.tiktokv",
+        "com.facebook.Facebook",
+        "com.twitter.twitter",
+        "com.apple.mobilesafari",  # optional, if you want Safari overlayed too
+    ]
+
+    # Generate Web Clips for downtime and blocked apps
+    webclips = []
+    all_blocked_apps = set(downtime_apps + manual_blocks)
+    for app_bundle in all_blocked_apps:
+        if app_bundle in always_allowed:
+            continue
+        if schedules.get("downtime", {}).get("enabled", True) and app_bundle in downtime_apps:
+            url = f"https://blocked.gdistrict.org/downtime?app={app_bundle}"
+            display_name = f"{app_bundle} (Downtime)"
+        else:
+            url = f"https://blocked.gdistrict.org/parent_block?app={app_bundle}"
+            display_name = f"{app_bundle} (Blocked)"
+
+        webclips.append({
+            "PayloadType": "com.apple.webClip.managed",
+            "PayloadVersion": 1,
+            "PayloadIdentifier": f"org.gdistrict.gprotect.webclip.{child_email}.{app_bundle}",
+            "PayloadUUID": new_uuid(),
+            "PayloadDisplayName": display_name,
+            "PayloadDescription": f"{display_name} overlay",
+            "IsRemovable": False,
+            "Precomposed": True,
+            "URL": url
+        })
 
     profile = {
         "PayloadContent": [
@@ -1456,52 +1493,12 @@ def generate_mdm_profile(child_email):
                 "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
                 "PayloadUUID": new_uuid(),
                 "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
-                "blacklistedAppBundleIDs": [
-                    "com.instagram.ios",
-                    "com.snapchat.snapchat",
-                    "com.tiktok.tiktokv",
-                    "com.facebook.Facebook",
-                    "com.twitter.twitter"
-                ],
-                "whitelistedAppBundleIDs": ["com.apple.mobilesafari", "com.apple.mobilemail"],
+                "blacklistedAppBundleIDs": list(all_blocked_apps),
+                "whitelistedAppBundleIDs": always_allowed,
                 "allowSafari": True,
-                "safariAllowAutoFill": False,
-                "safariAllowJavaScript": True,
-                "safariAllowPopups": False,
-                "safariForceFraudWarning": True,
-                "allowExplicitContent": False,
-                "allowBookstore": True,
-                "allowBookstoreErotica": False,
-                "allowGameCenter": False,
-                "allowAddingGameCenterFriends": False,
-                "allowMultiplayerGaming": False,
-                "forceEncryptedBackup": True,
-                "allowDiagnosticSubmission": False,
-                "allowScreenTime": True
-            },
-            # --- Screen Time ---
-            {
-                "PayloadType": "com.apple.screentime",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": "org.gdistrict.gprotect.screentime",
-                "PayloadUUID": new_uuid(),
-                "PayloadDisplayName": f"GProtect Screen Time for {child_name}",
-                "familyControlsEnabled": True,
-                "downtimeSchedule": {
-                    "enabled": schedules.get("downtime", {}).get("enabled", True),
-                    "start": {"hour": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[0]),
-                              "minute": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[1])},
-                    "end": {"hour": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[0]),
-                            "minute": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[1])}
-                },
-                "appLimits": {
-                    "application": {
-                        "com.apple.mobilesafari": {"timeLimit": schedules.get("screen_time", {}).get("daily_minutes", 120)*60}
-                    }
-                },
-                "alwaysAllowedBundleIDs": ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
+                "allowScreenTime": False
             }
-        ],
+        ] + webclips,  # append Web Clips for overlays
         "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
         "PayloadIdentifier": "org.gdistrict.gprotect",
         "PayloadRemovalDisallowed": True,
@@ -1509,7 +1506,7 @@ def generate_mdm_profile(child_email):
         "PayloadUUID": new_uuid(),
         "PayloadVersion": 1,
         "PayloadOrganization": "GProtect",
-        "PayloadDescription": "This profile enforces parental controls on this device. It cannot be removed without parent permission.",
+        "PayloadDescription": "This profile enforces parental controls on this device. Apps are overlaid with downtime/blocked pages.",
         "PayloadRemovalPassword": "220099"
     }
 
@@ -4409,7 +4406,8 @@ def api_off_task():
         d.setdefault("pending_commands", {}).setdefault("*", []).append({
             "type": "notify",
             "title": "Off-task detected",
-            "message": f"{student or 'Student'} visited a blocked page."
+            "message": f"{student or 'St
+udent'} visited a blocked page."
         })
         save_data(d)
         return jsonify({"ok": True})
