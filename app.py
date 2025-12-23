@@ -1388,27 +1388,6 @@ def mdm_checkin():
         return Response(plistlib.dumps({}), mimetype="application/xml")
 
 
-import uuid
-import plistlib
-from flask import Flask, jsonify, Response
-from OpenSSL import crypto
-
-app = Flask(__name__)
-
-# --- Load your APNS certificate from P12 ---
-P12_PATH = "mdm_identity.p12"
-P12_PASSWORD = b"supersecret"  # password as bytes
-
-with open(P12_PATH, "rb") as f:
-    p12_data = f.read()
-
-p12 = crypto.load_pkcs12(p12_data, P12_PASSWORD)
-cert = p12.get_certificate()
-
-# Generate a UUID from certificate CN (or use fixed if you prefer)
-APNS_CERT_UUID = str(uuid.uuid5(uuid.NAMESPACE_DNS, cert.get_subject().CN)).upper()
-APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
-
 
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
