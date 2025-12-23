@@ -1406,28 +1406,30 @@ def generate_mdm_profile(child_email):
     def new_uuid():
         return str(uuid.uuid4()).upper()
 
+    # Always allowed apps
     always_allowed = ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
+
+    # Apps subject to downtime/blocks
     downtime_apps = [
         "com.instagram.ios",
         "com.snapchat.snapchat",
         "com.tiktok.tiktokv",
         "com.facebook.Facebook",
         "com.twitter.twitter",
-        "com.apple.mobilesafari",
+        "com.apple.mobilesafari",  # optional
     ]
 
-    # Web Clips for overlays
+    # Generate Web Clips for overlays
     webclips = []
     all_blocked_apps = set(downtime_apps + manual_blocks)
     for app_bundle in all_blocked_apps:
         if app_bundle in always_allowed:
             continue
-
         if schedules.get("downtime", {}).get("enabled", True) and app_bundle in downtime_apps:
-            url = f"https://blocked.gdistrict.org/downtime?app={app_bundle}"
+            url = f"https://blocked.gdistrict.org/downtime?website={app_bundle}"
             display_name = f"{app_bundle} (Downtime)"
         else:
-            url = f"https://blocked.gdistrict.org/parent_block?app={app_bundle}"
+            url = f"https://blocked.gdistrict.org/parent_block?website={app_bundle}"
             display_name = f"{app_bundle} (Blocked)"
 
         webclips.append({
@@ -1436,15 +1438,16 @@ def generate_mdm_profile(child_email):
             "PayloadIdentifier": f"org.gdistrict.gprotect.webclip.{child_email}.{app_bundle}",
             "PayloadUUID": new_uuid(),
             "PayloadDisplayName": display_name,
+            "Label": display_name,  # REQUIRED
             "PayloadDescription": f"Overlay for {display_name}",
             "IsRemovable": False,
             "Precomposed": True,
             "URL": url
         })
 
-    # Build profile
     profile = {
         "PayloadContent": [
+            # --- MDM Payload ---
             {
                 "PayloadType": "com.apple.mdm",
                 "PayloadVersion": 1,
@@ -1458,6 +1461,7 @@ def generate_mdm_profile(child_email):
                 "Topic": APNS_TOPIC,
                 "SignMessage": True
             },
+            # --- Web Content Filter ---
             {
                 "PayloadType": "com.apple.webcontent-filter",
                 "PayloadVersion": 1,
@@ -1483,6 +1487,7 @@ def generate_mdm_profile(child_email):
                     "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
                 }
             },
+            # --- Restrictions ---
             {
                 "PayloadType": "com.apple.applicationaccess",
                 "PayloadVersion": 1,
@@ -1494,7 +1499,7 @@ def generate_mdm_profile(child_email):
                 "allowSafari": True,
                 "allowScreenTime": False
             }
-        ] + webclips,  # append webclips
+        ] + webclips,  # Append all Web Clips
         "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
         "PayloadIdentifier": "org.gdistrict.gprotect",
         "PayloadRemovalDisallowed": True,
