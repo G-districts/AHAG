@@ -1,8 +1,6 @@
 import sys
 import collections
 from OpenSSL import crypto
-import uuid
-import os
 
 # =========================
 # Patch collections for hyper/apns2 compatibility
@@ -14,14 +12,16 @@ if sys.version_info >= (3, 3):
     collections.MutableSet = collections.abc.MutableSet
     collections.MutableMapping = collections.abc.MutableMapping
 
-# =========================
-# Standard imports
-# =========================
+# Now import everything else
 from flask import Flask, request, jsonify, render_template, session, redirect, Response, url_for
 from flask_cors import CORS
-import json, time, sqlite3, traceback, re, random, hashlib
+import json, os, time, sqlite3, traceback, uuid, re
+from urllib.parse import urlparse
+import random, time, hashlib
 from datetime import datetime, time as dt_time
 from collections import defaultdict
+from image_filter_ai import classify_image as _gschool_classify_image
+import jwt
 from functools import wraps
 import plistlib
 from apns_mdm import send_mdm_push
@@ -42,11 +42,11 @@ try:
 except Exception as e:
     print("[WARN] Failed to register AI blueprint:", e)
 
-# =========================
-# ICE servers helper
-# =========================
+
 def _ice_servers():
+    # Always include Google STUN
     servers = [{"urls": ["stun:stun.l.google.com:19302"]}]
+    # Optional TURN from env
     turn_url = os.environ.get("TURN_URL")
     turn_user = os.environ.get("TURN_USER")
     turn_pass = os.environ.get("TURN_PASS")
@@ -58,13 +58,12 @@ def _ice_servers():
         })
     return servers
 
-# =========================
-# Paths
-# =========================
+
 ROOT = os.path.dirname(__file__)
 DATA_PATH = os.path.join(ROOT, "data.json")
 DB_PATH = os.path.join(ROOT, "gschool.db")
 SCENES_PATH = os.path.join(ROOT, "scenes.json")
+
 
 # =========================
 # Load APNS Certificate Safely
@@ -108,9 +107,10 @@ def get_apns_client():
             print("[WARN] Failed to initialize APNs client:", e)
             apns_client = None
     return apns_client
-# helpers==================================================================
 
-
+# =========================
+# Helpers: Data & Database
+# =========================
 def _clean_expired_bypass_codes(settings):
     now = time.time()
     settings["bypass_codes"] = [
