@@ -29,11 +29,6 @@ from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
 
-# --- MDM / APNS Certificate Config ---
-APNS_CERT_PATH = "mdm_identity.p12"  # replace with actual path
-APNS_CERT_PASSWORD = "supersecret"           # password you exported the p12 with
-APNS_CERT_UUID = "9507EF8F-DCBB-483E-89DB-298D5471C6C1"  # from your cert
-APNS_TOPIC = "com.gdistrict.gprotect"       # your MDM topic
 
 # ---------------------------
 # Flask App Initialization
@@ -71,49 +66,14 @@ DATA_PATH = os.path.join(ROOT, "data.json")
 DB_PATH = os.path.join(ROOT, "gschool.db")
 SCENES_PATH = os.path.join(ROOT, "scenes.json")
 
+APNS_PEM_PATH = "student_cert.pem"  # your PEM file path
 
-# =========================
-# Load APNS Certificate Safely
-# =========================
-def get_apns_cert_uuid():
-    """Returns a valid APNS certificate UUID or fallback."""
-    P12_PATH = os.path.join(ROOT, "mdm_identity.p12")
-    P12_PASSWORD = b"supersecret"
+def load_certificate_base64():
+    with open(APNS_PEM_PATH, "rb") as f:
+        return base64.b64encode(f.read()).decode("ascii")
 
-    if not os.path.exists(P12_PATH):
-        print("[WARN] APNS P12 file not found at", P12_PATH)
-        return "00000000-0000-0000-0000-000000000000"  # fallback dummy UUID
+APNS_CERT_B64 = load_certificate_base64()
 
-    try:
-        with open(P12_PATH, "rb") as f:
-            p12_data = f.read()
-        p12 = crypto.load_pkcs12(p12_data, P12_PASSWORD)
-        cert = p12.get_certificate()
-        uuid_val = str(uuid.uuid5(uuid.NAMESPACE_DNS, cert.get_subject().CN)).upper()
-        return uuid_val
-    except Exception as e:
-        print("[WARN] Failed to load APNS certificate:", e)
-        return "00000000-0000-0000-0000-000000000000"  # fallback dummy UUID
-
-# These can be reused anywhere in the app
-APNS_CERT_UUID = get_apns_cert_uuid()
-APNS_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
-
-# Optional: initialize APNs client lazily (on first push)
-apns_client = None
-def get_apns_client():
-    global apns_client
-    if apns_client is None:
-        try:
-            apns_client = APNsClient(
-                os.path.join(ROOT, "mdm_identity.p12"),
-                use_sandbox=False,
-                use_alternative_port=False
-            )
-        except Exception as e:
-            print("[WARN] Failed to initialize APNs client:", e)
-            apns_client = None
-    return apns_client
 
 # =========================
 # Helpers: Data & Database
@@ -1396,25 +1356,19 @@ def mdm_checkin():
 
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
-    d = ensure_keys(load_data())
-    _ensure_gprotect_structure(d)
-
+    # Example data structure, replace with your actual data handling
+    d = {"gprotect": {"children": [child_email], "schedules": {}, "manual_blocks": {}, "manual_allows": {}}}
+    
     if child_email not in d["gprotect"]["children"]:
         return jsonify({"ok": False, "error": "Not registered"}), 403
-
-    schedules = d["gprotect"]["schedules"].get(child_email, {})
-    manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
-    manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
 
     child_name = child_email.split("@")[0].capitalize()
 
     def new_uuid():
         return str(uuid.uuid4()).upper()
 
-    # Always allowed apps
+    # Apps
     always_allowed = ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
-
-    # Apps subject to downtime/blocks
     downtime_apps = [
         "com.instagram.ios",
         "com.snapchat.snapchat",
@@ -1423,40 +1377,35 @@ def generate_mdm_profile(child_email):
         "com.twitter.twitter",
         "com.apple.mobilesafari",
     ]
+    manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
+    manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
+    schedules = d["gprotect"]["schedules"].get(child_email, {})
 
-    # Generate Web Clips for overlays
-    webclips = []
     all_blocked_apps = set(downtime_apps + manual_blocks)
+
+    # WebClips
+    webclips = []
     for app_bundle in all_blocked_apps:
         if app_bundle in always_allowed:
             continue
-        if schedules.get("downtime", {}).get("enabled", True) and app_bundle in downtime_apps:
-            url = f"https://blocked.gdistrict.org/downtime?website={app_bundle}"
-            display_name = f"{app_bundle} (Downtime)"
-        else:
-            url = f"https://blocked.gdistrict.org/parent_block?website={app_bundle}"
-            display_name = f"{app_bundle} (Blocked)"
-
+        url = f"https://blocked.gdistrict.org/parent_block?website={app_bundle}"
+        display_name = f"{app_bundle} (Blocked)"
         webclips.append({
             "PayloadType": "com.apple.webClip.managed",
             "PayloadVersion": 1,
             "PayloadIdentifier": f"org.gdistrict.gprotect.webclip.{child_email}.{app_bundle}",
             "PayloadUUID": new_uuid(),
             "PayloadDisplayName": display_name,
-            "Label": display_name,  # REQUIRED
+            "Label": display_name,
             "PayloadDescription": f"Overlay for {display_name}",
             "IsRemovable": False,
             "Precomposed": True,
             "URL": url
         })
 
-    # Encode the .p12 certificate
-    with open(APNS_CERT_PATH, "rb") as f:
-        p12_data = base64.b64encode(f.read()).decode("ascii")
-
     profile = {
         "PayloadContent": [
-            # --- MDM Payload ---
+            # MDM Payload
             {
                 "PayloadType": "com.apple.mdm",
                 "PayloadVersion": 1,
@@ -1466,13 +1415,11 @@ def generate_mdm_profile(child_email):
                 "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
-                "IdentityCertificateUUID": APNS_CERT_UUID,
-                "Topic": APNS_TOPIC,
-                "SignMessage": True,
-                "IdentityCertificate": p12_data,
-                "Password": APNS_CERT_PASSWORD
+                "IdentityCertificate": APNS_CERT_B64,
+                "Topic": "YOUR_APNS_TOPIC",  # Replace with your APNS topic
+                "SignMessage": True
             },
-            # --- Web Content Filter ---
+            # Web Content Filter (example)
             {
                 "PayloadType": "com.apple.webcontent-filter",
                 "PayloadVersion": 1,
@@ -1498,7 +1445,7 @@ def generate_mdm_profile(child_email):
                     "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
                 }
             },
-            # --- Restrictions ---
+            # Restrictions
             {
                 "PayloadType": "com.apple.applicationaccess",
                 "PayloadVersion": 1,
@@ -1529,7 +1476,6 @@ def generate_mdm_profile(child_email):
         mimetype="application/x-apple-aspen-config",
         headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
-
 
 @app.route("/gprotect/mdm/update/<child_email>", methods=["POST"])
 def update_mdm_profile(child_email):
