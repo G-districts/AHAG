@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GProtect Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .children-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .child-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .child-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        .child-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-downtime {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .add-child-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 30px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            font-size: 24px;
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input {
+            width: auto;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .tabs-control {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .url-list {
+            list-style: none;
+            margin-top: 10px;
+        }
+
+        .url-list li {
+            padding: 10px;
+            background: #f8f9fa;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .category-item {
+            padding: 15px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #dc3545;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ GProtect Dashboard</h1>
+        <div>
+            <span id="parentName">Parent</span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <button class="add-child-btn" onclick="showAddChildModal()">+ Add Child</button>
+
+        <div class="children-grid" id="childrenGrid"></div>
+    </div>
+
+    <!-- Add Child Modal -->
+    <div class="modal" id="addChildModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Child</h2>
+                <button class="close-btn" onclick="closeModal('addChildModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Child's Email</label>
+                <input type="email" id="childEmail" placeholder="child@example.com">
+            </div>
+            <button class="btn-primary" onclick="addChild()">Add Child</button>
+        </div>
+    </div>
+
+    <!-- Child Settings Modal -->
+    <div class="modal" id="childSettingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings for <span id="currentChildEmail"></span></h2>
+                <button class="close-btn" onclick="closeModal('childSettingsModal')">&times;</button>
+            </div>
+
+            <div class="tabs-control">
+                <button class="tab-btn active" onclick="switchSettingsTab('schedules')">Schedules</button>
+                <button class="tab-btn" onclick="switchSettingsTab('ai')">AI Categories</button>
+                <button class="tab-btn" onclick="switchSettingsTab('manual')">Manual Blocks</button>
+                <button class="tab-btn" onclick="switchSettingsTab('logs')">Activity Logs</button>
+            </div>
+
+            <!-- Schedules Tab -->
+            <div class="tab-content active" id="schedulesTab">
+                <h3>Screen Time</h3>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="screenTimeEnabled">
+                    <label>Enable Daily Screen Time Limit</label>
+                </div>
+                <div class="form-group">
+                    <label>Daily Minutes</label>
+                    <input type="number" id="screenTimeMinutes" value="120" min="1">
+                </div>
+
+                <h3 style="margin-top: 30px;">School Hours</h3>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="schoolHoursEnabled">
+                    <label>Enable School Hours Control</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="schoolBlockAll">
+                    <label>Block All Apps/Sites During School</label>
+                </div>
+                <div class="form-group">
+                    <label>Start Time</label>
+                    <input type="time" id="schoolStart" value="08:00">
+                </div>
+                <div class="form-group">
+                    <label>End Time</label>
+                    <input type="time" id="schoolEnd" value="15:00">
+                </div>
+
+                <h3 style="margin-top: 30px;">Homework Hours</h3>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="hwEnabled">
+                    <label>Enable Homework Hours</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="hwAllowEducational">
+                    <label>Allow Educational Sites</label>
+                </div>
+                <div class="form-group">
+                    <label>Start Time</label>
+                    <input type="time" id="hwStart" value="15:30">
+                </div>
+                <div class="form-group">
+                    <label>End Time</label>
+                    <input type="time" id="hwEnd" value="18:00">
+                </div>
+
+                <h3 style="margin-top: 30px;">Downtime</h3>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="downtimeEnabled">
+                    <label>Enable Downtime (Block Everything)</label>
+                </div>
+                <div class="form-group">
+                    <label>Start Time</label>
+                    <input type="time" id="downtimeStart" value="21:00">
+                </div>
+                <div class="form-group">
+                    <label>End Time</label>
+                    <input type="time" id="downtimeEnd" value="07:00">
+                </div>
+
+                <button class="btn-primary" onclick="saveSchedules()">Save Schedules</button>
+            </div>
+
+            <!-- AI Categories Tab -->
+            <div class="tab-content" id="aiTab">
+                <div id="aiCategoriesList"></div>
+                <button class="btn-primary" onclick="saveAICategories()">Save AI Categories</button>
+            </div>
+
+            <!-- Manual Blocks Tab -->
+            <div class="tab-content" id="manualTab">
+                <h3>Blocked URLs</h3>
+                <div class="form-group">
+                    <input type="text" id="newBlockUrl" placeholder="example.com">
+                    <button class="btn-primary" style="margin-top: 10px;" onclick="addBlockUrl()">Add Block</button>
+                </div>
+                <ul class="url-list" id="blockList"></ul>
+
+                <h3 style="margin-top: 30px;">Allowed URLs (Override Blocks)</h3>
+                <div class="form-group">
+                    <input type="text" id="newAllowUrl" placeholder="educational-site.com">
+                    <button class="btn-primary" style="margin-top: 10px;" onclick="addAllowUrl()">Add Allow</button>
+                </div>
+                <ul class="url-list" id="allowList"></ul>
+
+                <button class="btn-primary" onclick="saveManualLists()">Save Lists</button>
+            </div>
+
+            <!-- Activity Logs Tab -->
+            <div class="tab-content" id="logsTab">
+                <div id="activityLogsList"></div>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+                <button class="btn-danger" onclick="removeChild()">Remove Child</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://gschool.gdistrict.org';
+        let currentChild = null;
+        let childrenData = [];
+        let aiCategories = [];
+        let currentBlocks = [];
+        let currentAllows = [];
+
+        async function init() {
+            const token = localStorage.getItem('gprotect_token');
+            if (!token) {
+                window.location.href = '/gprotect/login';
+                return;
+            }
+
+            const name = localStorage.getItem('gprotect_name');
+            document.getElementById('parentName').textContent = name || 'Parent';
+
+            await loadChildren();
+            await loadAICategories();
+        }
+
+        async function fetchAPI(url, options = {}) {
+            const token = localStorage.getItem('gprotect_token');
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+            const res = await fetch(API_BASE + url, options);
+            if (res.status === 401) {
+                localStorage.removeItem('gprotect_token');
+                window.location.href = '/gprotect/login';
+                return null;
+            }
+            return await res.json();
+        }
+
+        async function loadChildren() {
+            const data = await fetchAPI('/gprotect/children');
+            if (data && data.ok) {
+                childrenData = data.children;
+                renderChildren();
+            }
+        }
+
+        function renderChildren() {
+            const grid = document.getElementById('childrenGrid');
+            grid.innerHTML = '';
+
+            childrenData.forEach(child => {
+                const card = document.createElement('div');
+                card.className = 'child-card';
+                card.onclick = () => openChildSettings(child.email);
+
+                const status = determineStatus(child);
+
+                card.innerHTML = `
+                    <span class="status-badge status-${status.type}">${status.label}</span>
+                    <h3>${child.email}</h3>
+                    <p style="color: #666; font-size: 14px;">Click to manage settings</p>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        function determineStatus(child) {
+            const schedules = child.schedules || {};
+            const downtime = schedules.downtime || {};
+
+            if (downtime.enabled) {
+                return {type: 'downtime', label: 'Downtime Active'};
+            }
+            return {type: 'active', label: 'Active'};
+        }
+
+        function showAddChildModal() {
+            document.getElementById('addChildModal').classList.add('show');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        async function addChild() {
+            const email = document.getElementById('childEmail').value.trim();
+            if (!email) {
+                alert('Please enter an email');
+                return;
+            }
+
+            const data = await fetchAPI('/gprotect/children', {
+                method: 'POST',
+                body: JSON.stringify({email})
+            });
+
+            if (data && data.ok) {
+                closeModal('addChildModal');
+                document.getElementById('childEmail').value = '';
+                await loadChildren();
+            } else {
+                alert(data?.error || 'Failed to add child');
+            }
+        }
+
+        async function openChildSettings(email) {
+            currentChild = email;
+            document.getElementById('currentChildEmail').textContent = email;
+            document.getElementById('childSettingsModal').classList.add('show');
+
+            const child = childrenData.find(c => c.email === email);
+            if (child) {
+                loadSchedulesTab(child);
+                loadAITab(child);
+                loadManualTab(child);
+                loadLogsTab(email);
+            }
+        }
+
+        function loadSchedulesTab(child) {
+            const s = child.schedules || {};
+
+            const st = s.screen_time || {};
+            document.getElementById('screenTimeEnabled').checked = st.enabled || false;
+            document.getElementById('screenTimeMinutes').value = st.daily_minutes || 120;
+
+            const sh = s.school_hours || {};
+            document.getElementById('schoolHoursEnabled').checked = sh.enabled || false;
+            document.getElementById('schoolBlockAll').checked = sh.block_all || false;
+            document.getElementById('schoolStart').value = sh.start || '08:00';
+            document.getElementById('schoolEnd').value = sh.end || '15:00';
+
+            const hw = s.homework_hours || {};
+            document.getElementById('hwEnabled').checked = hw.enabled || false;
+            document.getElementById('hwAllowEducational').checked = hw.allow_educational !== false;
+            document.getElementById('hwStart').value = hw.start || '15:30';
+            document.getElementById('hwEnd').value = hw.end || '18:00';
+
+            const dt = s.downtime || {};
+            document.getElementById('downtimeEnabled').checked = dt.enabled || false;
+            document.getElementById('downtimeStart').value = dt.start || '21:00';
+            document.getElementById('downtimeEnd').value = dt.end || '07:00';
+        }
+
+        async function saveSchedules() {
+            const schedules = {
+                screen_time: {
+                    enabled: document.getElementById('screenTimeEnabled').checked,
+                    daily_minutes: parseInt(document.getElementById('screenTimeMinutes').value)
+                },
+                school_hours: {
+                    enabled: document.getElementById('schoolHoursEnabled').checked,
+                    block_all: document.getElementById('schoolBlockAll').checked,
+                    start: document.getElementById('schoolStart').value,
+                    end: document.getElementById('schoolEnd').value,
+                    days: [1,2,3,4,5]
+                },
+                homework_hours: {
+                    enabled: document.getElementById('hwEnabled').checked,
+                    allow_educational: document.getElementById('hwAllowEducational').checked,
+                    start: document.getElementById('hwStart').value,
+                    end: document.getElementById('hwEnd').value,
+                    days: [1,2,3,4,5]
+                },
+                downtime: {
+                    enabled: document.getElementById('downtimeEnabled').checked,
+                    start: document.getElementById('downtimeStart').value,
+                    end: document.getElementById('downtimeEnd').value,
+                    block_all: true
+                }
+            };
+
+            for (const [type, config] of Object.entries(schedules)) {
+                await fetchAPI(`/gprotect/schedules/${currentChild}`, {
+                    method: 'POST',
+                    body: JSON.stringify({type, config})
+                });
+            }
+
+            alert('Schedules saved!');
+            await loadChildren();
+        }
+
+        async function loadAICategories() {
+            const data = await fetch(API_BASE + '/gprotect/ai/categories').then(r => r.json());
+            if (data && data.ok) {
+                aiCategories = data.categories;
+            }
+        }
+
+        function loadAITab(child) {
+            const list = document.getElementById('aiCategoriesList');
+            list.innerHTML = '';
+
+            const blocked = child.ai_categories || {};
+
+            aiCategories.forEach(cat => {
+                const item = document.createElement('div');
+                item.className = 'category-item';
+
+                const isBlocked = blocked[cat.id] === true;
+
+                item.innerHTML = `
+                    <div>
+                        <strong>${cat.name}</strong>
+                        <p style="font-size: 12px; color: #666;">${cat.description || ''}</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-category="${cat.id}" ${isBlocked ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                `;
+
+                list.appendChild(item);
+            });
+        }
+
+        async function saveAICategories() {
+            const checkboxes = document.querySelectorAll('#aiCategoriesList input[type="checkbox"]');
+            const categories = {};
+
+            checkboxes.forEach(cb => {
+                categories[cb.dataset.category] = cb.checked;
+            });
+
+            await fetchAPI(`/gprotect/ai/categories/${currentChild}`, {
+                method: 'POST',
+                body: JSON.stringify({categories})
+            });
+
+            alert('AI Categories saved!');
+            await loadChildren();
+        }
+
+        function loadManualTab(child) {
+            currentBlocks = child.manual_blocks || [];
+            currentAllows = child.manual_allows || [];
+
+            renderUrlList('blockList', currentBlocks);
+            renderUrlList('allowList', currentAllows);
+        }
+
+        function renderUrlList(id, urls) {
+            const list = document.getElementById(id);
+            list.innerHTML = '';
+
+            urls.forEach((url, idx) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span>${url}</span>
+                    <button class="remove-btn" onclick="removeUrl('${id}', ${idx})">Remove</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function removeUrl(listId, idx) {
+            if (listId === 'blockList') {
+                currentBlocks.splice(idx, 1);
+                renderUrlList('blockList', currentBlocks);
+            } else {
+                currentAllows.splice(idx, 1);
+                renderUrlList('allowList', currentAllows);
+            }
+        }
+
+        function addBlockUrl() {
+            const url = document.getElementById('newBlockUrl').value.trim();
+            if (url) {
+                currentBlocks.push(url);
+                renderUrlList('blockList', currentBlocks);
+                document.getElementById('newBlockUrl').value = '';
+            }
+        }
+
+        function addAllowUrl() {
+            const url = document.getElementById('newAllowUrl').value.trim();
+            if (url) {
+                currentAllows.push(url);
+                renderUrlList('allowList', currentAllows);
+                document.getElementById('newAllowUrl').value = '';
+            }
+        }
+
+        async function saveManualLists() {
+            await fetchAPI(`/gprotect/manual/${currentChild}`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    blocks: currentBlocks,
+                    allows: currentAllows
+                })
+            });
+
+            alert('Manual lists saved!');
+            await loadChildren();
+        }
+
+        async function loadLogsTab(email) {
+            const data = await fetchAPI(`/gprotect/logs/${email}`);
+            const list = document.getElementById('activityLogsList');
+
+            if (data && data.ok) {
+                list.innerHTML = '';
+                data.logs.slice(0, 50).forEach(log => {
+                    const div = document.createElement('div');
+                    div.style.padding = '10px';
+                    div.style.background = '#f8f9fa';
+                    div.style.marginBottom = '10px';
+                    div.style.borderRadius = '5px';
+
+                    const date = new Date(log.ts * 1000);
+                    div.innerHTML = `
+                        <strong>${log.type}</strong><br>
+                        <small>${date.toLocaleString()}</small><br>
+                        ${log.url ? `<small>URL: ${log.url}</small>` : ''}
+                    `;
+                    list.appendChild(div);
+                });
+            }
+        }
+
+        async function removeChild() {
+            if (!confirm('Remove this child? All settings will be deleted.')) return;
+
+            await fetchAPI(`/gprotect/children/${currentChild}`, {method: 'DELETE'});
+            closeModal('childSettingsModal');
+            await loadChildren();
+        }
+
+        function switchSettingsTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+        }
+
+        function logout() {
+            localStorage.removeItem('gprotect_token');
+            localStorage.removeItem('gprotect_email');
+            localStorage.removeItem('gprotect_name');
+            window.location.href = '/gprotect/login';
+        }
+
+        init();
+    </script>
+</body>
+</html>
