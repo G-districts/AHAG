@@ -1442,6 +1442,7 @@ def mdm_commands():
 
     return Response(plistlib.dumps(payload), mimetype="application/xml")
 
+
 @app.route("/gprotect/mdm/checkin", methods=["PUT"])
 def mdm_checkin():
     try:
@@ -1472,6 +1473,7 @@ def mdm_checkin():
     except Exception as e:
         print("MDM checkin error:", e)
         return Response(plistlib.dumps({}), mimetype="application/xml", status=200)
+
 
 @app.route("/gprotect/mdm/cert-profile/<child_email>", methods=["GET"])
 def download_identity_cert_profile(child_email):
