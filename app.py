@@ -4484,49 +4484,6 @@ def api_off_task():
             pass
         return jsonify({"ok": False}), 500
 
-@app.route("/gprotect/mdm/cert-profile", methods=["GET"])
-def download_identity_cert_profile():
-    import plistlib
-    import uuid
-    from flask import Response
-
-    CERT_PAYLOAD_UUID = str(uuid.uuid4()).upper()
-
-    profile = {
-        "PayloadType": "Configuration",
-        "PayloadVersion": 1,
-        "PayloadUUID": str(uuid.uuid4()).upper(),
-        "PayloadIdentifier": "org.gdistrict.gprotect.identity.profile",
-        "PayloadDisplayName": "GProtect MDM Identity Certificate",
-        "PayloadDescription": "Installs the required identity certificate for GProtect MDM.",
-        "PayloadOrganization": "GProtect",
-
-        "PayloadContent": [
-            {
-                "PayloadType": "com.apple.security.pkcs12",
-                "PayloadVersion": 1,
-                "PayloadUUID": CERT_PAYLOAD_UUID,
-                "PayloadIdentifier": "org.gdistrict.gprotect.identity",
-                "PayloadDisplayName": "APSP:9507ef8f-dcbb-483e-89db-298d5471c6c1",
-
-                # MUST be bytes, MUST be base64 of the .p12
-                "PayloadContent": IDENTITY_P12_B64.encode("utf-8"),
-
-                # MUST match the export password exactly
-                "Password": "supersecret"
-            }
-        ]
-    }
-
-    plist_data = plistlib.dumps(profile)
-
-    return Response(
-        plist_data,
-        mimetype="application/x-apple-aspen-config",
-        headers={
-            "Content-Disposition": "attachment; filename=GProtect_Identity_Certificate.mobileconfig"
-        }
-    )
 
 
 # =========================
