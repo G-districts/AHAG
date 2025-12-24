@@ -29,7 +29,10 @@ from apns_mdm import send_mdm_push
 from apns2.client import APNsClient
 from apns2.payload import Payload
 import uuid
-
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 # ---------------------------
 # Flask App Initialization
@@ -338,6 +341,87 @@ def _is_guest_identity(email: str, name: str) -> bool:
 #=========================
 # Parental control
 #=========================
+
+# File paths for CA key/cert
+CA_KEY_FILE = "ca_key.pem"
+CA_CERT_FILE = "ca_cert.pem"
+
+def load_or_create_ca():
+    if os.path.exists(CA_KEY_FILE) and os.path.exists(CA_CERT_FILE):
+        # Load existing CA
+        with open(CA_KEY_FILE, "rb") as f:
+            ca_key = serialization.load_pem_private_key(f.read(), password=None)
+        with open(CA_CERT_FILE, "rb") as f:
+            ca_cert = x509.load_pem_x509_certificate(f.read())
+        print("Loaded existing CA")
+        return ca_key, ca_cert
+    else:
+        # Generate new CA
+        ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"GProtect CA"),
+            x509.NameAttribute(NameOID.COMMON_NAME, u"GProtect Root CA"),
+        ])
+        ca_cert = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(issuer)
+            .public_key(ca_key.public_key())
+            .serial_number(int(time.time()*1000))
+            .not_valid_before(x509.datetime.datetime.utcnow())
+            .not_valid_after(x509.datetime.datetime.utcnow() + x509.datetime.timedelta(days=3650))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .sign(ca_key, hashes.SHA256())
+        )
+        # Save CA key and cert
+        with open(CA_KEY_FILE, "wb") as f:
+            f.write(ca_key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.TraditionalOpenSSL,
+                serialization.NoEncryption()
+            ))
+        with open(CA_CERT_FILE, "wb") as f:
+            f.write(ca_cert.public_bytes(serialization.Encoding.PEM))
+        print("Generated new CA")
+        return ca_key, ca_cert
+
+CA_KEY, CA_CERT = load_or_create_ca()
+
+@app.route("/scep", methods=["POST", "GET"])
+def scep():
+    """
+    Simplified SCEP endpoint for testing MDM.
+    Automatically generates client certificates from submitted CSR.
+    """
+    try:
+        csr_data = request.data
+        if not csr_data:
+            return "No CSR provided", 400
+
+        csr = x509.load_der_x509_csr(csr_data)  # iOS sends DER
+
+        # Generate client certificate
+        client_cert = (
+            x509.CertificateBuilder()
+            .subject_name(csr.subject)
+            .issuer_name(CA_CERT.subject)
+            .public_key(csr.public_key())
+            .serial_number(int(time.time()*1000))
+            .not_valid_before(x509.datetime.datetime.utcnow())
+            .not_valid_after(x509.datetime.datetime.utcnow() + x509.datetime.timedelta(days=365))
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .sign(CA_KEY, hashes.SHA256())
+        )
+
+        # Return DER-encoded certificate
+        cert_bytes = client_cert.public_bytes(serialization.Encoding.DER)
+        return Response(cert_bytes, mimetype="application/x-x509-ca-cert")
+    
+    except Exception as e:
+        print("SCEP error:", e)
+        return str(e), 500
+
 with open("mdm_identity.b64", "r") as f:
     IDENTITY_P12_B64 = f.read().strip()
 
@@ -362,62 +446,69 @@ def _ensure_mdm_structure(d):
     return mdm
 
 
+CA_CERT_FILE = "ca_cert.pem"
+with open(CA_CERT_FILE, "rb") as f:
+    CA_CERT = x509.load_pem_x509_certificate(f.read())
+
+MDM_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
+
 @app.route("/mdm/checkin", methods=["PUT"])
 def mdm_checkin():
-    """Apple MDM Check-in endpoint"""
     try:
-        plist_data = request.data
-        message = plistlib.loads(plist_data)
-        
-        message_type = message.get("MessageType")
-        udid = message.get("UDID")
-        
-        print(f"[MDM CheckIn] Message: {message_type} from UDID: {udid}")
-        
-        # Accept Authenticate without certificate verification (TEST ONLY)
-        if message_type == "Authenticate":
-            return handle_authenticate_no_cert(message)
-        elif message_type == "TokenUpdate":
-            return handle_token_update(message)
-        elif message_type == "CheckOut":
-            return handle_checkout(message)
-        else:
-            return Response(status=400)
-            
-    except Exception as e:
-        print(f"[MDM CheckIn] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return Response(status=500)
+        # Load plist from request
+        plist = plistlib.loads(request.data)
+        message_type = plist.get("MessageType")
+        udid = plist.get("UDID")
+        email = plist.get("UserEmail", "unknown@example.com")
 
-def handle_authenticate_no_cert(message):
-    """Handle authentication without certificate (TESTING ONLY)"""
-    udid = message.get("UDID")
-    
-    if not udid:
-        return Response(status=401)
-    
-    d = ensure_keys(load_data())
-    mdm = _ensure_mdm_structure(d)
-    
-    # Store device info
-    device_info = {
-        "udid": udid,
-        "enrolled_at": int(time.time()),
-        "last_seen": int(time.time()),
-        "os_version": message.get("OSVersion", "Unknown"),
-        "model_name": message.get("ModelName", "Unknown"),
-        "serial_number": message.get("SerialNumber", "Unknown"),
-        "device_name": message.get("DeviceName", "Unknown"),
-    }
-    
-    mdm["enrolled_devices"][udid] = device_info
-    save_data(d)
-    
-    print(f"[MDM] ✅ Authenticated (no cert): {udid}")
-    
-    # Return success
-    return Response(status=200)
+        print("MDM CHECK-IN:", message_type, udid)
+
+        # Validate client certificate (from SCEP)
+        if not request.environ.get('SSL_CLIENT_CERT'):
+            print("No client certificate presented")
+            return Response(plistlib.dumps({}), mimetype="application/xml", status=403)
+
+        client_cert_pem = request.environ['SSL_CLIENT_CERT'].encode()
+        client_cert = x509.load_pem_x509_certificate(client_cert_pem)
+
+        # Verify certificate is signed by our CA
+        CA_PUBLIC_KEY = CA_CERT.public_key()
+        try:
+            CA_PUBLIC_KEY.verify(
+                client_cert.signature,
+                client_cert.tbs_certificate_bytes,
+                client_cert.signature_hash_algorithm,
+            )
+        except Exception as e:
+            print("Certificate verification failed:", e)
+            return Response(plistlib.dumps({}), mimetype="application/xml", status=403)
+
+        # Validate topic matches
+        topic = plist.get("Topic")
+        if topic != MDM_TOPIC:
+            print(f"Topic mismatch! Got {topic}, expected {MDM_TOPIC}")
+            return Response(plistlib.dumps({}), mimetype="application/xml", status=403)
+
+        # Process Authenticate or TokenUpdate messages
+        if message_type in ("Authenticate", "TokenUpdate"):
+            d = ensure_keys(load_data())
+            _ensure_gprotect_structure(d)
+            d["gprotect"].setdefault("mdm_tokens", {})[email] = {
+                "udid": udid,
+                "device_token": plist.get("DeviceToken", ""),
+                "push_magic": plist.get("PushMagic", ""),
+                "topic": topic,
+                "last_checkin": int(time.time())
+            }
+            save_data(d)
+
+        # Always return valid plist
+        return Response(plistlib.dumps({}), mimetype="application/xml", status=200)
+
+    except Exception as e:
+        print("MDM checkin error:", e)
+        return Response(plistlib.dumps({}), mimetype="application/xml", status=500)
+
 # =========================
 # GPROTECT - PARENT CONTROLS
 # =========================
