@@ -1482,8 +1482,7 @@ def generate_mdm_profile(child_email):
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
                 "IdentityCertificateUUID": identity_uuid,
-                "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1
-",  # <--- MUST BE VALID
+                "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",  # <--- MUST BE VALID
                 "SignMessage": True
             },
             # Web Content Filter
