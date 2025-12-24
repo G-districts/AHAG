@@ -342,10 +342,6 @@ def _is_guest_identity(email: str, name: str) -> bool:
 # Parental control
 #=========================
 
-# File paths for CA key/cert
-CA_KEY_FILE = "ca_key.pem"
-CA_CERT_FILE = "ca_cert.pem"
-
 def load_or_create_ca():
     if os.path.exists(CA_KEY_FILE) and os.path.exists(CA_CERT_FILE):
         # Load existing CA
@@ -369,8 +365,8 @@ def load_or_create_ca():
             .issuer_name(issuer)
             .public_key(ca_key.public_key())
             .serial_number(int(time.time()*1000))
-            .not_valid_before(x509.datetime.datetime.utcnow())
-            .not_valid_after(x509.datetime.datetime.utcnow() + x509.datetime.timedelta(days=3650))
+            .not_valid_before(datetime.datetime.utcnow())  # <-- use datetime from Python stdlib
+            .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=3650))
             .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
             .sign(ca_key, hashes.SHA256())
         )
@@ -385,8 +381,6 @@ def load_or_create_ca():
             f.write(ca_cert.public_bytes(serialization.Encoding.PEM))
         print("Generated new CA")
         return ca_key, ca_cert
-
-CA_KEY, CA_CERT = load_or_create_ca()
 
 @app.route("/scep", methods=["POST", "GET"])
 def scep():
