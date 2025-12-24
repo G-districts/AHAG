@@ -1468,8 +1468,8 @@ def generate_mdm_profile(child_email):
                 "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
                 "PayloadUUID": identity_uuid,
                 "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
-                "PayloadContent": identity_b64,
-                "Password": "supersecret"
+                "PayloadContent": IDENTITY_P12_B64.encode("utf-8"),  # must be bytes
+                "Password": "supersecret"  # exactly the password you used to export the .p12
             },
             # MDM (must have valid Topic!)
             {
