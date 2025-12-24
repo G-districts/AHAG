@@ -1411,113 +1411,138 @@ def mdm_checkin():
         print("MDM checkin error:", e)
         return Response(plistlib.dumps({}), mimetype="application/xml")
 
-@app.route("/gprotect/mdm/profile/<child_email>")
+@app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
+    import uuid, plistlib
+    from flask import Response
+
     def new_uuid():
         return str(uuid.uuid4()).upper()
 
     child_name = child_email.split("@")[0].capitalize()
 
-    # Example dynamically generated lists
-    blacklisted_apps = ["com.instagram.ios", "com.snapchat.snapchat"]
-    whitelisted_apps = ["com.apple.mobilesafari", "com.apple.mobilemail"]
+    # Identity certificate base64 (must be bytes)
+    identity_b64 = IDENTITY_P12_B64.encode("utf-8")
+    identity_uuid = new_uuid()
 
-    # --------------------------
-    # Build payloads
-    # --------------------------
-    identity_payload = {
-        "PayloadType": "com.apple.security.pkcs12",
-        "PayloadVersion": 1,
-        "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
-        "PayloadUUID": new_uuid(),
-        "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
-        "PayloadContent": IDENTITY_P12_B64,
-        "Password": "supersecret",  # PKCS12 password
-    }
+    # Always allowed apps
+    always_allowed = ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
 
-    web_filter_payload = {
-        "PayloadType": "com.apple.webcontent-filter",
-        "PayloadVersion": 1,
-        "PayloadIdentifier": "org.gdistrict.gprotect.webfilter",
-        "PayloadUUID": new_uuid(),
-        "PayloadDisplayName": "GProtect Web Filter",
-        "PayloadDescription": "Content filtering controlled by parent",
-        "FilterType": "Plugin",
-        "UserDefinedName": "GProtect Filter",
-        "PluginBundleID": "org.gdistrict.gprotect.filter",
-        "ServerAddress": "https://gschool.gdistrict.org",
-        "Organization": "GProtect",
-        "FilterDataProviderBundleIdentifier": "org.gdistrict.gprotect.dataprovider",
-        "FilterDataProviderDesignatedRequirement": 'identifier "org.gdistrict.gprotect.dataprovider"',
-    }
+    # Downtime apps / blocks
+    downtime_apps = [
+        "com.instagram.ios",
+        "com.snapchat.snapchat",
+        "com.tiktok.tiktokv",
+        "com.facebook.Facebook",
+        "com.twitter.twitter",
+        "com.apple.mobilesafari",
+    ]
 
-    restrictions_payload = {
-        "PayloadType": "com.apple.applicationaccess",
-        "PayloadVersion": 1,
-        "PayloadIdentifier": "org.gdistrict.gprotect.restrictions",
-        "PayloadUUID": new_uuid(),
-        "PayloadDisplayName": "GProtect Restrictions",
-        "blacklistedAppBundleIDs": blacklisted_apps,
-        "whitelistedAppBundleIDs": whitelisted_apps,
-        "allowSafari": True,
-        "safariAllowAutoFill": False,
-        "safariAllowJavaScript": True,
-        "safariAllowPopups": False,
-        "safariForceFraudWarning": True,
-        "allowExplicitContent": False,
-        "allowBookstore": True,
-        "allowBookstoreErotica": False,
-        "allowGameCenter": False,
-        "allowAddingGameCenterFriends": False,
-        "allowMultiplayerGaming": False,
-        "forceEncryptedBackup": True,
-        "allowDiagnosticSubmission": False,
-        # Downtime
-        "downtimeSchedule": {
-            "enabled": True,
-            "start": {"hour": 21, "minute": 0},
-            "end": {"hour": 7, "minute": 0},
-        },
-    }
+    # Manual overrides (from your DB or config)
+    manual_blocks = []  # replace with real data
+    manual_allows = []  # replace with real data
 
-    vpn_payload = {
-        "PayloadType": "com.apple.vpn.managed",
-        "PayloadVersion": 1,
-        "PayloadIdentifier": "org.gdistrict.gprotect.vpn",
-        "PayloadUUID": new_uuid(),
-        "PayloadDisplayName": "GProtect Filter VPN",
-        "UserDefinedName": "GProtect Content Filter",
-        "VPNType": "IKEv2",
-        "IKEv2": {
-            "RemoteAddress": "vpn.gdistrict.org",
-            "RemoteIdentifier": "vpn.gdistrict.org",
-            "LocalIdentifier": "gprotect",
-            "AuthenticationMethod": "SharedSecret",
-            "SharedSecret": "BASE64-ENCODED-SECRET",
-            "ExtendedAuthEnabled": 1,
-            "AuthName": "gprotect",
-            "AuthPassword": "DEVICE-SPECIFIC-PASSWORD",
-        },
-        "OnDemandEnabled": 1,
-        "OnDemandRules": [{"Action": "Connect"}],
-    }
+    all_blocked_apps = set(downtime_apps + manual_blocks)
+
+    # WebClip overlay payloads for blocked apps
+    webclips = []
+    for app_bundle in all_blocked_apps:
+        if app_bundle in always_allowed or app_bundle in manual_allows:
+            continue
+        url = f"https://blocked.gdistrict.org/parent_block?app={app_bundle}"
+        display_name = f"{app_bundle} (Blocked)"
+        webclips.append({
+            "PayloadType": "com.apple.webClip.managed",
+            "PayloadVersion": 1,
+            "PayloadIdentifier": f"org.gdistrict.gprotect.webclip.{child_email}.{app_bundle}",
+            "PayloadUUID": new_uuid(),
+            "PayloadDisplayName": display_name,
+            "Label": display_name,
+            "PayloadDescription": f"Overlay for {display_name}",
+            "IsRemovable": False,
+            "Precomposed": True,
+            "URL": url
+        })
 
     profile = {
-        "PayloadType": "Configuration",
-        "PayloadVersion": 1,
-        "PayloadUUID": new_uuid(),
-        "PayloadIdentifier": "org.gdistrict.gprotect",
-        "PayloadDisplayName": "GProtect Parental Controls",
-        "PayloadOrganization": "GProtect",
-        "PayloadDescription": "This profile enforces parental controls on this device. It cannot be removed without parent permission.",
-        "PayloadRemovalDisallowed": True,
-        "PayloadRemovalPassword": REMOVAL_PASSWORD,
         "PayloadContent": [
-            identity_payload,
-            web_filter_payload,
-            restrictions_payload,
-            vpn_payload
-        ]
+            # Identity Payload
+            {
+                "PayloadType": "com.apple.security.pkcs12",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
+                "PayloadUUID": identity_uuid,
+                "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
+                "PayloadContent": identity_b64,
+                "Password": "supersecret"  # PKCS12 password
+            },
+            # MDM Payload
+            {
+                "PayloadType": "com.apple.mdm",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.mdm.{child_email}",
+                "PayloadUUID": new_uuid(),
+                "PayloadDisplayName": f"GProtect MDM for {child_name}",
+                "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
+                "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
+                "AccessRights": 8191,
+                "IdentityCertificateUUID": identity_uuid,
+                "Topic": "YOUR_APNS_TOPIC",
+                "SignMessage": True
+            },
+            # Web Content Filter
+            {
+                "PayloadType": "com.apple.webcontent-filter",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.webfilter.{child_email}",
+                "PayloadUUID": new_uuid(),
+                "PayloadDisplayName": f"GProtect Web Filter for {child_name}",
+                "PayloadDescription": "Content filtering controlled by parent",
+                "FilterType": "Plugin",
+                "UserDefinedName": "GProtect Filter",
+                "PluginBundleID": "org.gdistrict.gprotect.filter",
+                "ServerAddress": "https://gschool.gdistrict.org",
+                "Organization": "GProtect",
+                "FilterDataProviderBundleIdentifier": "org.gdistrict.gprotect.dataprovider",
+                "FilterDataProviderDesignatedRequirement": 'identifier "org.gdistrict.gprotect.dataprovider"',
+                "ContentFilterUUID": new_uuid(),
+                "FilterBrowsers": True,
+                "FilterSockets": False,
+                "FilterPackets": False,
+                "VendorConfig": {
+                    "child_email": child_email,
+                    "manual_blocks": manual_blocks,
+                    "manual_allows": manual_allows,
+                    "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
+                }
+            },
+            # Restrictions / downtime
+            {
+                "PayloadType": "com.apple.applicationaccess",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.restrictions.{child_email}",
+                "PayloadUUID": new_uuid(),
+                "PayloadDisplayName": f"GProtect Restrictions for {child_name}",
+                "blacklistedAppBundleIDs": list(all_blocked_apps),
+                "whitelistedAppBundleIDs": always_allowed + manual_allows,
+                "allowSafari": True,
+                "allowScreenTime": True,
+                "downtimeSchedule": {
+                    "enabled": True,
+                    "start": {"hour": 21, "minute": 0},
+                    "end": {"hour": 7, "minute": 0},
+                },
+            }
+        ] + webclips,
+        "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
+        "PayloadIdentifier": "org.gdistrict.gprotect",
+        "PayloadRemovalDisallowed": True,
+        "PayloadType": "Configuration",
+        "PayloadUUID": new_uuid(),
+        "PayloadVersion": 1,
+        "PayloadOrganization": "GProtect",
+        "PayloadDescription": "This profile enforces parental controls on this device. Apps are overlaid with downtime/blocked pages.",
+        "PayloadRemovalPassword": "supersecret"
     }
 
     plist_data = plistlib.dumps(profile)
