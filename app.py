@@ -1466,7 +1466,7 @@ def generate_mdm_profile(child_email):
                 "ServerURL": "https://gschool.gdistrict.org/mdm/commands",
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
-                "IdentityCertificateUUID": identity_uuid,
+                "IdentityCertificateUUID": "APSP:9507ef8f-dcbb-483e-89db-298d5471c6c1",
                 "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1",  # <--- MUST BE VALID
                 "SignMessage": True
             },
