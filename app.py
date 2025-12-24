@@ -364,12 +364,8 @@ def _ensure_mdm_structure(d):
 
 @app.route("/mdm/checkin", methods=["PUT"])
 def mdm_checkin():
-    """
-    Apple MDM Check-in endpoint
-    Handles Authenticate, TokenUpdate, and CheckOut messages
-    """
+    """Apple MDM Check-in endpoint"""
     try:
-        # Parse plist from request body
         plist_data = request.data
         message = plistlib.loads(plist_data)
         
@@ -378,14 +374,14 @@ def mdm_checkin():
         
         print(f"[MDM CheckIn] Message: {message_type} from UDID: {udid}")
         
+        # Accept Authenticate without certificate verification (TEST ONLY)
         if message_type == "Authenticate":
-            return handle_authenticate(message)
+            return handle_authenticate_no_cert(message)
         elif message_type == "TokenUpdate":
             return handle_token_update(message)
         elif message_type == "CheckOut":
             return handle_checkout(message)
         else:
-            print(f"[MDM CheckIn] Unknown message type: {message_type}")
             return Response(status=400)
             
     except Exception as e:
@@ -394,151 +390,34 @@ def mdm_checkin():
         traceback.print_exc()
         return Response(status=500)
 
-
-def handle_authenticate(message):
-    """Handle initial device authentication"""
+def handle_authenticate_no_cert(message):
+    """Handle authentication without certificate (TESTING ONLY)"""
     udid = message.get("UDID")
     
     if not udid:
-        print("[MDM] Authenticate failed: No UDID")
         return Response(status=401)
     
     d = ensure_keys(load_data())
     mdm = _ensure_mdm_structure(d)
     
-    # Extract device information
+    # Store device info
     device_info = {
         "udid": udid,
         "enrolled_at": int(time.time()),
         "last_seen": int(time.time()),
         "os_version": message.get("OSVersion", "Unknown"),
-        "build_version": message.get("BuildVersion", "Unknown"),
-        "product_name": message.get("ProductName", "Unknown"),
-        "serial_number": message.get("SerialNumber", "Unknown"),
-        "imei": message.get("IMEI", ""),
-        "meid": message.get("MEID", ""),
         "model_name": message.get("ModelName", "Unknown"),
-        "model": message.get("Model", "Unknown"),
+        "serial_number": message.get("SerialNumber", "Unknown"),
         "device_name": message.get("DeviceName", "Unknown"),
-        "topic": message.get("Topic", MDM_PUSH_TOPIC),
-        "user_id": message.get("UserID", ""),
-        "user_long_name": message.get("UserLongName", ""),
-        "user_short_name": message.get("UserShortName", ""),
     }
     
-    # Store device enrollment
     mdm["enrolled_devices"][udid] = device_info
-    
-    # Try to link device to student email
-    child_email = None
-    gp = d.get("gprotect", {})
-    
-    # Check if we have a pending enrollment for this serial number
-    serial = device_info.get("serial_number")
-    if serial:
-        for email, devices in gp.get("devices", {}).items():
-            for dev in devices:
-                if dev.get("serial_number") == serial:
-                    child_email = email
-                    break
-            if child_email:
-                break
-    
-    if child_email:
-        device_info["child_email"] = child_email
-        print(f"[MDM] Device {udid} linked to {child_email}")
-    
     save_data(d)
     
-    log_action({
-        "event": "mdm_device_authenticated",
-        "udid": udid,
-        "serial": serial,
-        "model": device_info.get("model_name")
-    })
+    print(f"[MDM] ✅ Authenticated (no cert): {udid}")
     
-    print(f"[MDM] Authenticated device {udid} ({device_info.get('model_name')})")
+    # Return success
     return Response(status=200)
-
-
-def handle_token_update(message):
-    """Handle push token updates"""
-    udid = message.get("UDID")
-    token = message.get("Token")
-    push_magic = message.get("PushMagic")
-    topic = message.get("Topic")
-    
-    if not udid or not token:
-        print("[MDM] TokenUpdate failed: Missing UDID or Token")
-        return Response(status=400)
-    
-    d = ensure_keys(load_data())
-    mdm = _ensure_mdm_structure(d)
-    
-    # Update device token
-    mdm["device_tokens"][udid] = {
-        "token": token.hex() if isinstance(token, bytes) else token,
-        "push_magic": push_magic,
-        "topic": topic or MDM_PUSH_TOPIC,
-        "updated_at": int(time.time())
-    }
-    
-    # Update last seen
-    if udid in mdm["enrolled_devices"]:
-        mdm["enrolled_devices"][udid]["last_seen"] = int(time.time())
-        mdm["enrolled_devices"][udid]["push_magic"] = push_magic
-    
-    save_data(d)
-    
-    print(f"[MDM] Token updated for {udid}")
-    
-    # If we have pending commands, return one
-    if udid in mdm.get("pending_commands", {}):
-        commands = mdm["pending_commands"][udid]
-        if commands:
-            command = commands.pop(0)
-            mdm["pending_commands"][udid] = commands
-            save_data(d)
-            
-            print(f"[MDM] Sending command to {udid}: {command.get('RequestType')}")
-            return Response(
-                plistlib.dumps(command),
-                mimetype="application/xml",
-                status=200
-            )
-    
-    return Response(status=200)
-
-
-def handle_checkout(message):
-    """Handle device unenrollment"""
-    udid = message.get("UDID")
-    
-    if not udid:
-        return Response(status=400)
-    
-    d = ensure_keys(load_data())
-    mdm = _ensure_mdm_structure(d)
-    
-    # Mark device as checked out
-    if udid in mdm["enrolled_devices"]:
-        mdm["enrolled_devices"][udid]["checked_out"] = True
-        mdm["enrolled_devices"][udid]["checkout_time"] = int(time.time())
-    
-    # Clear pending commands
-    if udid in mdm["pending_commands"]:
-        del mdm["pending_commands"][udid]
-    
-    save_data(d)
-    
-    log_action({
-        "event": "mdm_device_checkout",
-        "udid": udid
-    })
-    
-    print(f"[MDM] Device {udid} checked out")
-    return Response(status=200)
-
 # =========================
 # GPROTECT - PARENT CONTROLS
 # =========================
