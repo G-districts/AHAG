@@ -1322,31 +1322,38 @@ def mdm_commands():
     }
 
     return Response(plistlib.dumps(payload), mimetype="application/xml")
-@app.route("/gprotect/mdm/checkin", methods=["POST"])
+
+@app.route("/gprotect/mdm/checkin", methods=["PUT"])
 def mdm_checkin():
-    """
-    iOS device posts check-in info here (UDID, device token, etc.)
-    """
     try:
         plist = plistlib.loads(request.data)
+
+        message_type = plist.get("MessageType")
         udid = plist.get("UDID")
         email = plist.get("UserEmail", "unknown@example.com")
+
+        print("MDM CHECK-IN:", message_type, udid)
 
         d = ensure_keys(load_data())
         _ensure_gprotect_structure(d)
 
-        # Save UDID and device token
-        d["gprotect"].setdefault("mdm_tokens", {})[email] = {
-            "udid": udid,
-            "device_token": plist.get("DeviceToken", ""),
-            "last_checkin": int(time.time())
-        }
-        save_data(d)
+        if message_type in ("Authenticate", "TokenUpdate"):
+            d["gprotect"].setdefault("mdm_tokens", {})[email] = {
+                "udid": udid,
+                "device_token": plist.get("DeviceToken", ""),
+                "push_magic": plist.get("PushMagic", ""),
+                "topic": plist.get("Topic", ""),
+                "last_checkin": int(time.time())
+            }
+            save_data(d)
 
+        # Apple only cares that you return 200 + valid plist
         return Response(plistlib.dumps({}), mimetype="application/xml")
+
     except Exception as e:
         print("MDM checkin error:", e)
-        return Response(plistlib.dumps({}), mimetype="application/xml")
+        return Response(plistlib.dumps({}), mimetype="application/xml", status=200)
+
 @app.route("/gprotect/mdm/cert-profile/<child_email>", methods=["GET"])
 def download_identity_cert_profile(child_email):
     import plistlib, uuid
