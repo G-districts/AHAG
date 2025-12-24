@@ -1462,16 +1462,7 @@ def generate_mdm_profile(child_email):
     profile = {
         "PayloadContent": [
             # Identity
-            {
-                "PayloadType": "com.apple.security.pkcs12",
-                "PayloadVersion": 1,
-                "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
-                "PayloadUUID": identity_uuid,
-                "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
-                "PayloadContent": IDENTITY_P12_B64.encode("utf-8"),  # must be bytes
-                "Password": "supersecret"  # exactly the password you used to export the .p12
-            },
-            # MDM (must have valid Topic!)
+                        # MDM (must have valid Topic!)
             {
                 "PayloadType": "com.apple.mdm",
                 "PayloadVersion": 1,
