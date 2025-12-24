@@ -1420,15 +1420,13 @@ def generate_mdm_profile(child_email):
         return str(uuid.uuid4()).upper()
 
     child_name = child_email.split("@")[0].capitalize()
-
-    # Identity certificate base64 (must be bytes)
     identity_b64 = IDENTITY_P12_B64.encode("utf-8")
     identity_uuid = new_uuid()
 
     # Always allowed apps
     always_allowed = ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
 
-    # Downtime apps / blocks
+    # Downtime / blocked apps
     downtime_apps = [
         "com.instagram.ios",
         "com.snapchat.snapchat",
@@ -1437,28 +1435,25 @@ def generate_mdm_profile(child_email):
         "com.twitter.twitter",
         "com.apple.mobilesafari",
     ]
-
-    # Manual overrides (from your DB or config)
-    manual_blocks = []  # replace with real data
-    manual_allows = []  # replace with real data
+    manual_blocks = []  # replace with real manual blocks
+    manual_allows = []  # replace with real manual allows
 
     all_blocked_apps = set(downtime_apps + manual_blocks)
 
-    # WebClip overlay payloads for blocked apps
+    # Webclips overlay
     webclips = []
     for app_bundle in all_blocked_apps:
         if app_bundle in always_allowed or app_bundle in manual_allows:
             continue
         url = f"https://blocked.gdistrict.org/parent_block?app={app_bundle}"
-        display_name = f"{app_bundle} (Blocked)"
         webclips.append({
             "PayloadType": "com.apple.webClip.managed",
             "PayloadVersion": 1,
             "PayloadIdentifier": f"org.gdistrict.gprotect.webclip.{child_email}.{app_bundle}",
             "PayloadUUID": new_uuid(),
-            "PayloadDisplayName": display_name,
-            "Label": display_name,
-            "PayloadDescription": f"Overlay for {display_name}",
+            "PayloadDisplayName": f"{app_bundle} (Blocked)",
+            "Label": f"{app_bundle} (Blocked)",
+            "PayloadDescription": f"Overlay for {app_bundle}",
             "IsRemovable": False,
             "Precomposed": True,
             "URL": url
@@ -1466,7 +1461,7 @@ def generate_mdm_profile(child_email):
 
     profile = {
         "PayloadContent": [
-            # Identity Payload
+            # Identity
             {
                 "PayloadType": "com.apple.security.pkcs12",
                 "PayloadVersion": 1,
@@ -1474,9 +1469,9 @@ def generate_mdm_profile(child_email):
                 "PayloadUUID": identity_uuid,
                 "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
                 "PayloadContent": identity_b64,
-                "Password": "supersecret"  # PKCS12 password
+                "Password": "supersecret"
             },
-            # MDM Payload
+            # MDM (must have valid Topic!)
             {
                 "PayloadType": "com.apple.mdm",
                 "PayloadVersion": 1,
@@ -1487,7 +1482,8 @@ def generate_mdm_profile(child_email):
                 "CheckInURL": "https://gschool.gdistrict.org/mdm/checkin",
                 "AccessRights": 8191,
                 "IdentityCertificateUUID": identity_uuid,
-                "Topic": "YOUR_APNS_TOPIC",
+                "Topic": "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1
+",  # <--- MUST BE VALID
                 "SignMessage": True
             },
             # Web Content Filter
@@ -1516,7 +1512,7 @@ def generate_mdm_profile(child_email):
                     "api_endpoint": "https://gschool.gdistrict.org/gprotect/mdm/config"
                 }
             },
-            # Restrictions / downtime
+            # Restrictions
             {
                 "PayloadType": "com.apple.applicationaccess",
                 "PayloadVersion": 1,
@@ -1526,12 +1522,61 @@ def generate_mdm_profile(child_email):
                 "blacklistedAppBundleIDs": list(all_blocked_apps),
                 "whitelistedAppBundleIDs": always_allowed + manual_allows,
                 "allowSafari": True,
-                "allowScreenTime": True,
+                "safariAllowAutoFill": False,
+                "safariAllowJavaScript": True,
+                "safariAllowPopups": False,
+                "safariForceFraudWarning": True,
+                "allowExplicitContent": False,
+                "allowBookstore": True,
+                "allowBookstoreErotica": False,
+                "allowGameCenter": False,
+                "allowAddingGameCenterFriends": False,
+                "allowMultiplayerGaming": False,
+                "forceEncryptedBackup": True,
+                "allowDiagnosticSubmission": False,
+                "allowScreenTime": True
+            },
+            # ScreenTime / Downtime
+            {
+                "PayloadType": "com.apple.screentime",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.screentime.{child_email}",
+                "PayloadUUID": new_uuid(),
+                "PayloadDisplayName": "GProtect Screen Time",
+                "familyControlsEnabled": True,
                 "downtimeSchedule": {
                     "enabled": True,
                     "start": {"hour": 21, "minute": 0},
-                    "end": {"hour": 7, "minute": 0},
+                    "end": {"hour": 4, "minute": 0}
                 },
+                "appLimits": {
+                    "application": {
+                        "com.apple.mobilesafari": {"timeLimit": 7200}  # 2 hours
+                    }
+                },
+                "alwaysAllowedBundleIDs": always_allowed
+            },
+            # VPN
+            {
+                "PayloadType": "com.apple.vpn.managed",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": "org.gdistrict.gprotect.vpn",
+                "PayloadUUID": new_uuid(),
+                "PayloadDisplayName": "GProtect Filter VPN",
+                "UserDefinedName": "GProtect Content Filter",
+                "VPNType": "IKEv2",
+                "IKEv2": {
+                    "RemoteAddress": "vpn.gdistrict.org",
+                    "RemoteIdentifier": "vpn.gdistrict.org",
+                    "LocalIdentifier": "gprotect",
+                    "AuthenticationMethod": "SharedSecret",
+                    "SharedSecret": "BASE64-ENCODED-SECRET",
+                    "ExtendedAuthEnabled": 1,
+                    "AuthName": "gprotect",
+                    "AuthPassword": "220099"
+                },
+                "OnDemandEnabled": 1,
+                "OnDemandRules": [{"Action": "Connect"}]
             }
         ] + webclips,
         "PayloadDisplayName": f"GProtect Parental Controls for {child_name}",
@@ -1552,6 +1597,7 @@ def generate_mdm_profile(child_email):
         mimetype="application/x-apple-aspen-config",
         headers={"Content-Disposition": f"attachment; filename={child_name}_gprotect.mobileconfig"}
     )
+
 
 
 
