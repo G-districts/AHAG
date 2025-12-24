@@ -1425,15 +1425,15 @@ def generate_mdm_profile(child_email):
     # --------------------------
     # Build payloads
     # --------------------------
-    identity_payload = {
-        "PayloadType": "com.apple.security.pkcs12",
-        "PayloadVersion": 1,
-        "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
-        "PayloadUUID": new_uuid(),
-        "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
-        # Must be bytes for plistlib to generate <data>
-        "PayloadContent": IDENTITY_P12_B64.encode("utf-8"),
-    }
+identity_payload = {
+    "PayloadType": "com.apple.security.pkcs12",
+    "PayloadVersion": 1,
+    "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
+    "PayloadUUID": new_uuid(),
+    "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
+    "PayloadContent": IDENTITY_P12_B64,
+    "Password": "supersecret"  # <-- This tells iOS the PKCS#12 password
+}
 
     web_filter_payload = {
         "PayloadType": "com.apple.webcontent-filter",
