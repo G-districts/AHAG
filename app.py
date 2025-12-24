@@ -3,6 +3,53 @@ import collections
 from OpenSSL import crypto
 import base64
 
+CA_KEY_FILE = "ca_key.pem"
+CA_CERT_FILE = "ca_cert.pem"
+
+def load_or_create_ca():
+    # If both exist, load them
+    if os.path.exists(CA_KEY_FILE) and os.path.exists(CA_CERT_FILE):
+        with open(CA_KEY_FILE, "rb") as f:
+            ca_key = serialization.load_pem_private_key(f.read(), password=None)
+        with open(CA_CERT_FILE, "rb") as f:
+            ca_cert = x509.load_pem_x509_certificate(f.read())
+        print("Loaded existing CA")
+        return ca_key, ca_cert
+
+    # Otherwise, create a new CA
+    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name([
+        x509.NameAttribute(x509.NameOID.COUNTRY_NAME, u"US"),
+        x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, u"GProtect CA"),
+        x509.NameAttribute(x509.NameOID.COMMON_NAME, u"GProtect Root CA"),
+    ])
+    ca_cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(ca_key.public_key())
+        .serial_number(int(time.time()*1000))
+        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=3650))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(ca_key, hashes.SHA256())
+    )
+
+    # Save files
+    with open(CA_KEY_FILE, "wb") as f:
+        f.write(ca_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption()
+        ))
+    with open(CA_CERT_FILE, "wb") as f:
+        f.write(ca_cert.public_bytes(serialization.Encoding.PEM))
+
+    print("Generated new CA")
+    return ca_key, ca_cert
+
+# Call this once at startup
+CA_KEY, CA_CERT = load_or_create_ca()
 # =========================
 # Patch collections for hyper/apns2 compatibility
 # =========================
