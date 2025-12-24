@@ -1443,37 +1443,118 @@ def mdm_commands():
     return Response(plistlib.dumps(payload), mimetype="application/xml")
 
 
+EXPECTED_TOPIC = "com.apple.mgmt.External.9507ef8f-dcbb-483e-89db-298d5471c6c1"
+
 @app.route("/gprotect/mdm/checkin", methods=["PUT"])
 def mdm_checkin():
     try:
         plist = plistlib.loads(request.data)
-
         message_type = plist.get("MessageType")
         udid = plist.get("UDID")
-        email = plist.get("UserEmail", "unknown@example.com")
+        topic = plist.get("Topic")
+        email = plist.get("UserEmail", f"unknown-{udid}")
 
-        print("MDM CHECK-IN:", message_type, udid)
+        print("MDM CHECK-IN:", message_type, udid, topic)
+
+        # Verify topic matches expected
+        if topic != EXPECTED_TOPIC:
+            print(f"MDM topic mismatch! Device topic: {topic}")
+            return Response(plistlib.dumps({}), mimetype="application/xml", status=400)
 
         d = ensure_keys(load_data())
         _ensure_gprotect_structure(d)
 
+        # Store device info
         if message_type in ("Authenticate", "TokenUpdate"):
             d["gprotect"].setdefault("mdm_tokens", {})[email] = {
                 "udid": udid,
                 "device_token": plist.get("DeviceToken", ""),
+                "topic": topic,
                 "push_magic": plist.get("PushMagic", ""),
-                "topic": plist.get("Topic", ""),
                 "last_checkin": int(time.time())
             }
             save_data(d)
 
-        # Apple only cares that you return 200 + valid plist
-        return Response(plistlib.dumps({}), mimetype="application/xml")
+        # Build MDM commands for initial enrollment
+        device_commands = []
+
+        # 1️⃣ DeviceInformation
+        device_commands.append({
+            "CommandUUID": str(uuid.uuid4()).upper(),
+            "Command": {"RequestType": "DeviceInformation"}
+        })
+
+        # 2️⃣ InstallProfile with ScreenTime + WebFilter + web overlay
+        schedules = d["gprotect"]["schedules"].get(email, {})
+        manual_blocks = d["gprotect"]["manual_blocks"].get(email, [])
+        manual_allows = d["gprotect"]["manual_allows"].get(email, [])
+
+        payload_content = [
+            {
+                "PayloadType": "com.apple.screentime",
+                "PayloadVersion": 1,
+                "PayloadUUID": str(uuid.uuid4()).upper(),
+                "PayloadDisplayName": f"GProtect Screen Time for {email}",
+                "familyControlsEnabled": True,
+                "downtimeSchedule": {
+                    "enabled": schedules.get("downtime", {}).get("enabled", True),
+                    "start": {
+                        "hour": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[0]),
+                        "minute": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[1])
+                    },
+                    "end": {
+                        "hour": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[0]),
+                        "minute": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[1])
+                    }
+                },
+                "appLimits": {
+                    "application": {
+                        "com.apple.mobilesafari": {"timeLimit": schedules.get("screen_time", {}).get("daily_minutes", 120)*60}
+                    }
+                },
+                "alwaysAllowedBundleIDs": ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
+            },
+            {
+                "PayloadType": "com.apple.webcontent-filter",
+                "PayloadVersion": 1,
+                "PayloadUUID": str(uuid.uuid4()).upper(),
+                "PayloadDisplayName": f"GProtect Web Filter for {email}",
+                "FilterType": "Plugin",
+                "UserDefinedName": "GProtect Filter",
+                "PluginBundleID": "org.gdistrict.gprotect.filter",
+                "ServerAddress": "https://gschool.gdistrict.org",
+                "Organization": "GProtect",
+                "FilterDataProviderBundleIdentifier": "org.gdistrict.gprotect.dataprovider",
+                "FilterDataProviderDesignatedRequirement": 'identifier "org.gdistrict.gprotect.dataprovider"',
+                "ContentFilterUUID": str(uuid.uuid4()).upper(),
+                "FilterBrowsers": True,
+                "FilterSockets": False,
+                "FilterPackets": False,
+                "VendorConfig": {
+                    "child_email": email,
+                    "manual_blocks": manual_blocks,
+                    "manual_allows": manual_allows,
+                    "api_endpoint": f"https://gschool.gdistrict.org/gprotect/mdm/config/{email}",
+                    "web_overlay": True
+                }
+            }
+        ]
+
+        # Wrap payload in InstallProfile command
+        device_commands.append({
+            "CommandUUID": str(uuid.uuid4()).upper(),
+            "Command": {
+                "RequestType": "InstallProfile",
+                "Payload": {"PayloadContent": payload_content}
+            }
+        })
+
+        response_dict = {"Commands": device_commands}
+        return Response(plistlib.dumps(response_dict), mimetype="application/xml", status=200)
 
     except Exception as e:
         print("MDM checkin error:", e)
         return Response(plistlib.dumps({}), mimetype="application/xml", status=200)
-
 
 @app.route("/gprotect/mdm/cert-profile/<child_email>", methods=["GET"])
 def download_identity_cert_profile(child_email):
