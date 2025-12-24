@@ -1347,6 +1347,54 @@ def mdm_checkin():
     except Exception as e:
         print("MDM checkin error:", e)
         return Response(plistlib.dumps({}), mimetype="application/xml")
+@app.route("/gprotect/mdm/cert-profile/<child_email>", methods=["GET"])
+def download_identity_cert_profile(child_email):
+    import plistlib, uuid
+    from flask import Response
+
+    def new_uuid():
+        return str(uuid.uuid4()).upper()
+
+    child_name = child_email.split("@")[0].capitalize()
+
+    # Load the base64 of your .p12
+    with open("mdm_identity.b64", "r") as f:
+        IDENTITY_P12_B64 = f.read().strip()
+
+    # UUID for this cert payload
+    identity_payload_uuid = new_uuid()
+
+    profile = {
+        "PayloadType": "Configuration",
+        "PayloadVersion": 1,
+        "PayloadUUID": new_uuid(),
+        "PayloadIdentifier": f"org.gdistrict.gprotect.cert.{child_email}",
+        "PayloadDisplayName": f"GProtect Identity Certificate for {child_name}",
+        "PayloadOrganization": "GProtect",
+        "PayloadDescription": "Installs the identity certificate required for MDM.",
+        "PayloadContent": [
+            {
+                "PayloadType": "com.apple.security.pkcs12",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
+                "PayloadUUID": identity_payload_uuid,
+                "PayloadDisplayName": f"GProtect Identity ({child_name})",
+                "PayloadContent": IDENTITY_P12_B64.encode("utf-8"),
+                "Password": "supersecret"   # MUST match what you exported with
+            }
+        ]
+    }
+
+    plist_data = plistlib.dumps(profile)
+
+    return Response(
+        plist_data,
+        mimetype="application/x-apple-aspen-config",
+        headers={
+            "Content-Disposition": f"attachment; filename={child_name}_GProtect_Identity.mobileconfig"
+        }
+    )
+
 
 @app.route("/gprotect/mdm/profile/<child_email>", methods=["GET"])
 def generate_mdm_profile(child_email):
@@ -1399,6 +1447,15 @@ def generate_mdm_profile(child_email):
     profile = {
         "PayloadContent": [
             # Identity
+           {
+                "PayloadType": "com.apple.security.pkcs12",
+                "PayloadVersion": 1,
+                "PayloadIdentifier": f"org.gdistrict.gprotect.identity.{child_email}",
+                "PayloadUUID": identity_uuid,
+                "PayloadDisplayName": f"GProtect Student Identity ({child_name})",
+                "PayloadContent": IDENTITY_P12_B64.encode("utf-8"),
+                "Password": "supersecret"  # must match the password you set on export
+            },
                         # MDM (must have valid Topic!)
             {
                 "PayloadType": "com.apple.mdm",
