@@ -1254,96 +1254,106 @@ def mdm_server():
         udid = plist.get("UDID")
         child_email = None
 
-        # Match UDID to child_email in mdm_tokens
         d = ensure_keys(load_data())
         _ensure_gprotect_structure(d)
+
+        # Try to match UDID to an enrolled child
         for email, info in d["gprotect"].get("mdm_tokens", {}).items():
             if info.get("udid") == udid:
                 child_email = email
                 break
 
+        # If UDID is unknown, auto-register it under a temporary email
+        if not child_email:
+            child_email = f"unknown-{udid}"
+            d["gprotect"]["mdm_tokens"][child_email] = {
+                "udid": udid,
+                "device_token": plist.get("DeviceToken", ""),
+                "registered_at": int(time.time())
+            }
+            save_data(d)
+
         device_commands = []
 
-        if child_email:
-            # 1️⃣ Send DeviceInformation to complete enrollment
-            device_commands.append({
-                "CommandUUID": str(uuid.uuid4()).upper(),
-                "Command": {"RequestType": "DeviceInformation"}
-            })
+        # 1️⃣ Always send DeviceInformation first to complete enrollment
+        device_commands.append({
+            "CommandUUID": str(uuid.uuid4()).upper(),
+            "Command": {"RequestType": "DeviceInformation"}
+        })
 
-            # 2️⃣ Send ScreenTime + Web Filter payload
-            schedules = d["gprotect"]["schedules"].get(child_email, {})
-            manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
-            manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
+        # 2️⃣ Send ScreenTime + WebFilter payload if we have proper schedules
+        schedules = d["gprotect"]["schedules"].get(child_email, {})
+        manual_blocks = d["gprotect"]["manual_blocks"].get(child_email, [])
+        manual_allows = d["gprotect"]["manual_allows"].get(child_email, [])
 
-            payload_content = [
-                {
-                    "PayloadType": "com.apple.screentime",
-                    "PayloadVersion": 1,
-                    "PayloadUUID": str(uuid.uuid4()).upper(),
-                    "PayloadDisplayName": f"GProtect Screen Time for {child_email}",
-                    "familyControlsEnabled": True,
-                    "downtimeSchedule": {
-                        "enabled": schedules.get("downtime", {}).get("enabled", True),
-                        "start": {
-                            "hour": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[0]),
-                            "minute": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[1])
-                        },
-                        "end": {
-                            "hour": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[0]),
-                            "minute": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[1])
-                        }
+        payload_content = [
+            {
+                "PayloadType": "com.apple.screentime",
+                "PayloadVersion": 1,
+                "PayloadUUID": str(uuid.uuid4()).upper(),
+                "PayloadDisplayName": f"GProtect Screen Time for {child_email}",
+                "familyControlsEnabled": True,
+                "downtimeSchedule": {
+                    "enabled": schedules.get("downtime", {}).get("enabled", True),
+                    "start": {
+                        "hour": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[0]),
+                        "minute": int(schedules.get("downtime", {}).get("start", "21:00").split(":")[1])
                     },
-                    "appLimits": {
-                        "application": {
-                            "com.apple.mobilesafari": {"timeLimit": schedules.get("screen_time", {}).get("daily_minutes", 120)*60}
-                        }
-                    },
-                    "alwaysAllowedBundleIDs": ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
-                },
-                {
-                    "PayloadType": "com.apple.webcontent-filter",
-                    "PayloadVersion": 1,
-                    "PayloadUUID": str(uuid.uuid4()).upper(),
-                    "PayloadDisplayName": f"GProtect Web Filter for {child_email}",
-                    "FilterType": "Plugin",
-                    "UserDefinedName": "GProtect Filter",
-                    "PluginBundleID": "org.gdistrict.gprotect.filter",
-                    "ServerAddress": "https://gschool.gdistrict.org",
-                    "Organization": "GProtect",
-                    "FilterDataProviderBundleIdentifier": "org.gdistrict.gprotect.dataprovider",
-                    "FilterDataProviderDesignatedRequirement": 'identifier "org.gdistrict.gprotect.dataprovider"',
-                    "ContentFilterUUID": str(uuid.uuid4()).upper(),
-                    "FilterBrowsers": True,
-                    "FilterSockets": False,
-                    "FilterPackets": False,
-                    "VendorConfig": {
-                        "child_email": child_email,
-                        "manual_blocks": manual_blocks,
-                        "manual_allows": manual_allows,
-                        "api_endpoint": f"https://gschool.gdistrict.org/gprotect/mdm/config/{child_email}",
-                        "web_overlay": True
+                    "end": {
+                        "hour": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[0]),
+                        "minute": int(schedules.get("downtime", {}).get("end", "07:00").split(":")[1])
                     }
+                },
+                "appLimits": {
+                    "application": {
+                        "com.apple.mobilesafari": {"timeLimit": schedules.get("screen_time", {}).get("daily_minutes", 120)*60}
+                    }
+                },
+                "alwaysAllowedBundleIDs": ["com.apple.mobilephone", "com.apple.FaceTime", "com.apple.MobileSMS"]
+            },
+            {
+                "PayloadType": "com.apple.webcontent-filter",
+                "PayloadVersion": 1,
+                "PayloadUUID": str(uuid.uuid4()).upper(),
+                "PayloadDisplayName": f"GProtect Web Filter for {child_email}",
+                "FilterType": "Plugin",
+                "UserDefinedName": "GProtect Filter",
+                "PluginBundleID": "org.gdistrict.gprotect.filter",
+                "ServerAddress": "https://gschool.gdistrict.org",
+                "Organization": "GProtect",
+                "FilterDataProviderBundleIdentifier": "org.gdistrict.gprotect.dataprovider",
+                "FilterDataProviderDesignatedRequirement": 'identifier "org.gdistrict.gprotect.dataprovider"',
+                "ContentFilterUUID": str(uuid.uuid4()).upper(),
+                "FilterBrowsers": True,
+                "FilterSockets": False,
+                "FilterPackets": False,
+                "VendorConfig": {
+                    "child_email": child_email,
+                    "manual_blocks": manual_blocks,
+                    "manual_allows": manual_allows,
+                    "api_endpoint": f"https://gschool.gdistrict.org/gprotect/mdm/config/{child_email}",
+                    "web_overlay": True
                 }
-            ]
+            }
+        ]
 
-            # Wrap payload_content in InstallProfile command
-            command_uuid = str(uuid.uuid4()).upper()
-            device_commands.append({
-                "CommandUUID": command_uuid,
-                "Command": {
-                    "RequestType": "InstallProfile",
-                    "Payload": {"PayloadContent": payload_content}
-                }
-            })
+        # Wrap in InstallProfile command
+        command_uuid = str(uuid.uuid4()).upper()
+        device_commands.append({
+            "CommandUUID": command_uuid,
+            "Command": {
+                "RequestType": "InstallProfile",
+                "Payload": {"PayloadContent": payload_content}
+            }
+        })
 
-        # Send queued commands to device
+        # Include any queued commands for this UDID
         queued = pending_commands.get(udid, [])
         device_commands.extend(queued)
         pending_commands[udid] = []  # clear after sending
 
+        # Return commands plist to device
         response_dict = {"Commands": device_commands}
-
         return Response(plistlib.dumps(response_dict), mimetype="application/xml", status=200)
 
     except Exception as e:
